@@ -1,0 +1,93 @@
+
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+ 
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+
+.login-form {
+  background-color: #ffffff;
+  padding: 24px 32px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  width: 320px;
+  box-sizing: border-box;
+  transition: box-shadow 0.3s ease;
+}
+
+
+.login-form:hover {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+}
+
+
+.login-form h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 24px;
+  text-align: center;
+  color: #111827;
+}
+
+
+.error-message {
+  color: #ef4444; 
+  font-size: 0.875rem;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+/* Inputs */
+.login-form input[type="text"],
+.login-form input[type="password"] {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  box-sizing: border-box;
+}
+
+/* Focus sur input */
+.login-form input[type="text"]:focus,
+.login-form input[type="password"]:focus {
+  border-color: #3b82f6; /* bleu */
+  box-shadow: 0 0 5px 2px rgba(59, 130, 246, 0.4);
+  outline: none;
+}
+
+/* Bouton */
+.login-form button {
+  width: 100%;
+  background-color: #3b82f6;
+  color: white;
+  padding: 12px 0;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+}
+
+/* Hover sur bouton */
+.login-form button:hover {
+  background-color: #2563eb;
+  transform: scale(1.05);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.6);
+}
+
+.login-form button:active {
+  transform: scale(0.98);
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.5);
+}

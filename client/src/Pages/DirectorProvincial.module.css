@@ -1,0 +1,135 @@
+/* Container principal */
+.container {
+  max-width: 1100px;
+  margin: 30px auto;
+  padding: 25px 30px;
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #222;
+}
+
+/* Titre principal */
+h2 {
+  text-align: center;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #065f46; /* Vert foncé */
+  margin-bottom: 30px;
+  letter-spacing: 1.1px;
+}
+
+/* Tableau */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+  color: #333;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* En-tête du tableau */
+thead tr {
+  background-color: #065f46; /* Vert foncé */
+  color: white;
+  font-weight: 700;
+}
+
+thead th {
+  padding: 14px 12px;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  user-select: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+thead th:last-child {
+  border-right: none;
+}
+
+/* Lignes du corps */
+tbody tr {
+  background-color: #f9faf9;
+  transition: background-color 0.25s ease;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #e6f4ea;
+}
+
+tbody tr:hover {
+  background-color: #d1e7d3;
+}
+
+/* Cellules */
+tbody td {
+  padding: 14px 12px;
+  border-right: 1px solid #c3d8c3;
+  vertical-align: middle;
+}
+
+tbody td:last-child {
+  border-right: none;
+}
+
+/* Statut Validation */
+.status-validated {
+  color: #059669; /* vert */
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.status-not-validated {
+  color: #dc2626; /* rouge */
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+/* Bouton valider */
+button {
+  padding: 8px 18px;
+  background: linear-gradient(135deg, #059669, #047857);
+  border: none;
+  border-radius: 25px;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.6);
+  transition: background 0.3s ease, transform 0.15s ease;
+  user-select: none;
+  font-size: 0.95rem;
+}
+
+button:hover {
+  background: linear-gradient(135deg, #047857, #059669);
+  transform: scale(1.05);
+}
+
+button:disabled {
+  background: #a7d3bb;
+  cursor: not-allowed;
+  box-shadow: none;
+  color: #375a3a;
+}
+
+/* Message aucun utilisateur */
+.no-users-message {
+  text-align: center;
+  font-style: italic;
+  font-size: 1.3rem;
+  color: #777;
+  padding: 30px 0;
+}
+.status-accepted {
+  color: #16a34a; /* أخضر */
+  font-weight: 700;
+}
+
+.status-refused {
+  color: #dc2626; /* أحمر */
+  font-weight: 700;
+}
