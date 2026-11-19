@@ -1,10 +1,11 @@
+import { vi } from "vitest";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import Login from "./Pages/Login";
 
-jest.mock("react-router-dom", () => ({ useNavigate: () => jest.fn() }), { virtual: true });
-jest.mock("./security/AuthContext", () => ({
-  useAuth: () => ({ login: jest.fn(), user: null, loading: false })
+vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn() }));
+vi.mock("./security/AuthContext", () => ({
+  useAuth: () => ({ login: vi.fn(), user: null, loading: false })
 }));
 
 test("login page exposes accessible username and password fields", () => {
