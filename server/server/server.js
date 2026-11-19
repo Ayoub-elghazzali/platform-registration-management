@@ -3,12 +3,13 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const mongoose = require("mongoose");
+const { getMongoUri } = require("./config/database");
 
 app.use(cors());
 app.use(express.json());
 
 async function connectToDatabase() {
-  const mongoUri = process.env.MONGODB_URI;
+  const mongoUri = getMongoUri();
 
   if (!mongoUri) {
     throw new Error(
