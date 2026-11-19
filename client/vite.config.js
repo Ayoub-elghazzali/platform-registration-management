@@ -24,6 +24,11 @@ export default defineConfig({
     }
   ],
   publicDir: "public",
+  esbuild: {
+    loader: "jsx",
+    include: /src\\/.*\\.jsx?$/,
+    exclude: []
+  },
   build: {
     copyPublicDir: false,
     outDir: "dist",
