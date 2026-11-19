@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "../security/api";
 import { useAuth } from "../security/AuthContext";
-import styles from "./DirectorProvincial.module.css";
 
 
 function DirectorProvincial() {
