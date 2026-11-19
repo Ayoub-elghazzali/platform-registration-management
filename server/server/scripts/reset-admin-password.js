@@ -14,7 +14,7 @@ async function main() {
   const passwordHash = await hashPassword(password);
   const result = await models.Admin.updateOne(
     { username },
-    { $set: { passwordHash, passwordChangedAt: new Date(), isActive: true }, $unset: { password: '' } }
+    { $set: { passwordHash, passwordChangedAt: new Date() }, $unset: { password: '' } }
   );
   if (!result.matchedCount) throw new Error('Administrator not found.');
   const admin = await models.Admin.findOne({ username });
