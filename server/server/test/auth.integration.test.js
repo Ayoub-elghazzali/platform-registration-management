@@ -262,6 +262,22 @@ test('administrator listings never expose password fields', async () => {
   assert.ok(response.body.every(admin => !Object.hasOwn(admin, 'password') && !Object.hasOwn(admin, 'passwordHash')));
 });
 
+
+test('super administrator accounts cannot be disabled through the admin API', async () => {
+  await createAdmin('protected-super-admin');
+  const { agent, csrfToken } = await signIn('root-admin');
+  const response = await agent.delete('/deleteAdmin/protected-super-admin').set('X-CSRF-Token', csrfToken);
+  assert.equal(response.status, 403);
+});
+
+test('ordinary ADMIN cannot disable another global ADMIN', async () => {
+  await createAdmin('global-admin-target', 'ADMIN');
+  await createAdmin('global-admin-operator', 'ADMIN');
+  const { agent, csrfToken } = await signIn('global-admin-operator');
+  const response = await agent.delete('/deleteAdmin/global-admin-target').set('X-CSRF-Token', csrfToken);
+  assert.equal(response.status, 403);
+});
+
 test('repeated login attempts are rate limited', async () => {
   await createAdmin('rate-limited-admin');
   for (let i = 0; i < 8; i += 1) {
