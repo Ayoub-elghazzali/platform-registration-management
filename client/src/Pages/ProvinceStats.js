@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import axios from "../security/api";
+import { useAuth } from "../security/AuthContext";
 
 function ProvinceStats() {
   const [users, setUsers] = useState([]);
-  const province = localStorage.getItem("province")?.trim();
+  const { user } = useAuth();
+  const province = user?.province?.trim();
 
   useEffect(() => {
     if (province) {
       axios
-        .get(`http://localhost:3001/users/${province}`)
+        .get(`/users/${encodeURIComponent(province)}`)
         .then((res) => {
           const sorted = res.data.sort((a, b) => a.nom.localeCompare(b.nom));
           setUsers(sorted);
