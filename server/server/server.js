@@ -247,10 +247,11 @@ async function loginHandler(req, res, next) {
     if (verification.needsMigration) {
       try {
         const passwordHash = await hashPassword(password);
-        await Admin.updateOne(
+        const migration = await Admin.updateOne(
           { _id: admin._id, password },
           { $set: { passwordHash, passwordChangedAt: new Date() }, $unset: { password: '' } }
         );
+        if (!migration.matchedCount) return res.status(401).json({ error: 'Identifiants incorrects.' });
       } catch (migrationError) {
         // A verified legacy password shorter than current policy is not upgraded automatically.
         return res.status(403).json({ error: 'PASSWORD_RESET_REQUIRED', message: 'Votre ancien mot de passe ne respecte plus la politique de sécurité. Contactez un administrateur pour réinitialiser votre accès.' });
@@ -289,8 +290,8 @@ app.post('/auth/refresh', requireSameOrigin, requireCsrf, async (req, res, next)
 app.post('/auth/change-password', requireSameOrigin, requireCsrf, async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body || {};
-    if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || newPassword.length < 12 || newPassword.length > 128) {
-      return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir entre 12 et 128 caractères.' });
+    if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || newPassword.length < 12 || Buffer.byteLength(newPassword, 'utf8') > 72) {
+      return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir au moins 12 caractères et au maximum 72 octets UTF-8.' });
     }
     const admin = await Admin.findById(req.admin.id).select('+password +passwordHash');
     const verification = await verifyPassword(currentPassword, admin);
@@ -376,7 +377,7 @@ app.post('/addAdmin', requirePermission('admins:create'), async (req, res, next)
   try {
     const { username, password, role, province, region } = req.body || {};
     const normalizedRole = normalizeRole(role);
-    if (!validText(username, 3, 80) || typeof password !== 'string' || password.length < 12 || password.length > 128 ||
+    if (!validText(username, 3, 80) || typeof password !== 'string' || password.length < 12 || Buffer.byteLength(password, 'utf8') > 72 ||
         !normalizedRole || !['ADMIN', 'REGIONAL_ADMIN', 'PROVINCIAL_ADMIN'].includes(normalizedRole)) {
       return res.status(400).json({ error: 'Données administrateur invalides.' });
     }
