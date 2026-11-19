@@ -28,6 +28,10 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: client/package-lock.json
+      - name: Regenerate lockfile with compatible dependency updates
+        run: npm install --package-lock-only --ignore-scripts --legacy-peer-deps
+      - name: Apply non-breaking dependency security updates
+        run: npm audit fix --package-lock-only --ignore-scripts --legacy-peer-deps
       - name: Install frontend dependencies from lockfile
         run: npm ci --legacy-peer-deps
       - name: Verify React Router dependency
@@ -47,5 +51,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-npm-audit
-          path: client/npm-audit.json
+          path: |
+            client/npm-audit.json
+            client/package-lock.json
           if-no-files-found: ignore
