@@ -24,6 +24,7 @@ async function hashPassword(password) {
 async function verifyPassword(password, admin) {
   if (!admin || typeof password !== 'string') return { valid: false, needsMigration: false };
   if (admin.passwordHash) {
+    if (Buffer.byteLength(password, 'utf8') > 72) return { valid: false, needsMigration: false };
     return { valid: await bcrypt.compare(password, admin.passwordHash), needsMigration: false };
   }
   if (typeof admin.password === 'string' && admin.password.length > 0) {
