@@ -10,7 +10,8 @@
     "test:unit": "node --test test/database-config.test.js test/authorization.test.js test/passwords.test.js",
     "test:integration": "node --test test/auth.integration.test.js",
     "admin:create": "node scripts/create-super-admin.js",
-    "admin:reset": "node scripts/reset-admin-password.js"
+    "admin:reset": "node scripts/reset-admin-password.js",
+    "admin:scope": "node scripts/assign-admin-scope.js"
   },
   "keywords": [],
   "author": "",
