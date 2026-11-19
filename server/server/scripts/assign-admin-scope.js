@@ -4,6 +4,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const { getMongoUri } = require('../config/database');
 const { models } = require('../server');
+const { normalizeRole } = require('../security/authorization');
 
 async function main() {
   const username = process.env.SCOPE_ADMIN_USERNAME?.trim().toLowerCase();
@@ -15,6 +16,9 @@ async function main() {
   await mongoose.connect(getMongoUri());
   const admin = await models.Admin.findOne({ username });
   if (!admin) throw new Error('Administrator not found.');
+  const role = normalizeRole(admin.role);
+  if (region && role !== 'REGIONAL_ADMIN') throw new Error('Only a regional administrator can receive a region scope.');
+  if (province && role !== 'PROVINCIAL_ADMIN') throw new Error('Only a provincial administrator can receive a province scope.');
   if (region) admin.region = region;
   if (province) admin.province = province;
   await admin.save();
