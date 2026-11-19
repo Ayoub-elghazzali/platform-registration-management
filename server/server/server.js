@@ -121,7 +121,10 @@ function cookieValue(req, name) {
   for (const part of header.split(';')) {
     const index = part.indexOf('=');
     if (index < 0) continue;
-    if (part.slice(0, index).trim() === name) return decodeURIComponent(part.slice(index + 1).trim());
+    if (part.slice(0, index).trim() === name) {
+      try { return decodeURIComponent(part.slice(index + 1).trim()); }
+      catch (_) { return null; }
+    }
   }
   return null;
 }
@@ -374,6 +377,9 @@ app.use(requireCsrf);
 app.get('/users', requirePermission('users:read'), async (req, res, next) => {
   try {
     const requested = {};
+    if (req.query.status && !['en attente', 'accepté', 'refusé'].includes(String(req.query.status))) return res.status(400).json({ error: 'Filtre de statut invalide.' });
+    if (req.query.region && !validText(req.query.region, 1, 120)) return res.status(400).json({ error: 'Filtre de région invalide.' });
+    if (req.query.province && !validText(req.query.province, 1, 120)) return res.status(400).json({ error: 'Filtre de province invalide.' });
     if (req.query.status) requested.status = String(req.query.status);
     if (req.query.region) requested.region = String(req.query.region);
     if (req.query.province) requested.province = String(req.query.province);
@@ -470,6 +476,7 @@ app.delete('/deleteAdmin/:username', requirePermission('admins:disable'), async 
 app.get('/users/:province', requirePermission('users:read'), async (req, res, next) => {
   try {
     const province = req.params.province.trim();
+    if (!validText(province, 1, 120)) return res.status(400).json({ error: 'Province invalide.' });
     const scope = scopedQuery(req, { province });
     if (!scope) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
     const users = await User.find(scope).sort({ createdAt: -1 }).limit(100);
