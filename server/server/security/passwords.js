@@ -12,8 +12,8 @@ function safeEqual(left, right) {
 }
 
 async function hashPassword(password) {
-  if (typeof password !== 'string' || password.length < 12 || password.length > 128) {
-    throw new Error('Password must contain between 12 and 128 characters.');
+  if (typeof password !== 'string' || password.length < 12 || Buffer.byteLength(password, 'utf8') > 72) {
+    throw new Error('Password must contain at least 12 characters and at most 72 UTF-8 bytes.');
   }
   return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
