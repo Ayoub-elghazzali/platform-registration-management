@@ -8,7 +8,7 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [
-    react(),
+    react({ include: /\.[jt]sx?$/ }),
     {
       name: "copy-public-assets-without-legacy-cra-template",
       apply: "build",
