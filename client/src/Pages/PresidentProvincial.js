@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "../security/api";
 import { useAuth } from "../security/AuthContext";
-import ProvinceStats from "./ProvinceStats";
 import "./PresidentProvincial.module.css";
 
 
