@@ -125,4 +125,4 @@ GitHub Actions includes a backend unit/integration test workflow and a frontend 
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) and the [Legacy Account Migration Runbook](server/server/docs/MIGRATION.md). Report security issues privately to the repository owner. Never commit passwords, cookies, tokens, database URIs, or personal data.
+See [SECURITY.md](SECURITY.md), the [Phase B.3 Security Audit](server/server/docs/SECURITY-AUDIT.md), and the [Legacy Account Migration Runbook](server/server/docs/MIGRATION.md). Report security issues privately to the repository owner. Never commit passwords, cookies, tokens, database URIs, or personal data.
