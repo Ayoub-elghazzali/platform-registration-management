@@ -22,4 +22,5 @@ jobs:
         with:
           node-version: 22
       - run: npm install --legacy-peer-deps
+      - run: CI=true npm test -- --watchAll=false
       - run: npm run build
