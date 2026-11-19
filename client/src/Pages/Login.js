@@ -50,7 +50,7 @@ export default function Login() {
           onChange={event => setUsername(event.target.value)} required minLength={3} maxLength={80} />
         <label htmlFor="password">Mot de passe</label>
         <input id="password" name="password" type="password" autoComplete="current-password" value={password}
-          onChange={event => setPassword(event.target.value)} required maxLength={128} />
+          onChange={event => setPassword(event.target.value)} required maxLength={72} />
         <button type="submit" disabled={submitting || !username.trim() || !password}>
           {submitting ? "Connexion…" : "Se connecter"}
         </button>
