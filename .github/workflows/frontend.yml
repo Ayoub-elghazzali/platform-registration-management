@@ -10,6 +10,9 @@ on:
       - "client/**"
       - ".github/workflows/frontend.yml"
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,10 +20,32 @@ jobs:
       run:
         working-directory: client
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out source
+        uses: actions/checkout@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm install --legacy-peer-deps
-      - run: CI=true npm test -- --watchAll=false
-      - run: npm run build
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install frontend dependencies from lockfile
+        run: npm ci --legacy-peer-deps
+      - name: Verify React Router dependency
+        run: node -e "console.log(require.resolve('react-router-dom'))"
+      - name: Run frontend authentication tests
+        run: CI=true npm test -- --watchAll=false
+      - name: Build production frontend
+        if: always()
+        run: npm run build
+      - name: Audit frontend dependencies
+        if: always()
+        run: |
+          npm audit --json > npm-audit.json || true
+          node -e "const a=require('./npm-audit.json'); const v=a.metadata?.vulnerabilities||{}; console.log(JSON.stringify(v)); if ((v.high||0)+(v.critical||0)>0) process.exit(1)"
+      - name: Upload frontend dependency audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-npm-audit
+          path: client/npm-audit.json
+          if-no-files-found: ignore
