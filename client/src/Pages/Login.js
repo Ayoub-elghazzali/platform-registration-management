@@ -1,88 +1,60 @@
-
-
 import React, { useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../security/AuthContext";
 import "./Login.css";
 
-function Login() {
+const DASHBOARD_BY_ROLE = {
+  SUPER_ADMIN: "/dashboardGeneral",
+  ADMIN: "/dashboardGeneral",
+  REGIONAL_ADMIN: "/dashboardRegional",
+  PROVINCIAL_ADMIN: "/PresidentProvincial",
+  USER: "/"
+};
+
+export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  async function handleSubmit(event) {
+    event.preventDefault();
     setError("");
-
+    setSubmitting(true);
     try {
-      const response = await axios.post("http://localhost:3001/loginAdmin", {
-        username,
-        password,
-      });
-
-      if (response.data.success) {
-        const role = response.data.role;
-        const province = response.data.province || null; // نستخرج ال province من الرد
-
-        // تخزين province في localStorage (إذا كان موجود)
-        if (province) {
-          localStorage.setItem("province", province);
-        } else {
-          localStorage.removeItem("province"); // نحيدها إذا ما كايناش
-        }
-
-        // التنقل حسب الدور
-        if (role === "admin_general") {
-          navigate("/dashboardGeneral");
-        } else if (role === "president_regional") {
-          navigate("/dashboardRegional");
-        } else if (role === "Director_Regional") {
-          navigate("/DirectorRegional");
-        } else if (role === "president_provincial") {
-          navigate("/PresidentProvincial");
-        } else if (role === "director_provincial") {
-          navigate("/DirectorProvincial");
-        } else {
-          setError("Rôle non reconnu.");
-        }
-      } else {
-        setError("Nom d'utilisateur ou mot de passe incorrect.");
+      const user = await login(username.trim(), password);
+      const destination = DASHBOARD_BY_ROLE[user.role];
+      if (!destination || destination === "/") {
+        setError("Ce compte ne possède pas d’espace administrateur.");
+        return;
       }
-    } catch (err) {
-      setError("Erreur lors de la connexion.");
-      console.error(err);
+      setPassword("");
+      navigate(destination, { replace: true });
+    } catch (requestError) {
+      const response = requestError.response;
+      setError(response?.data?.message || response?.data?.error || "Connexion impossible. Vérifiez vos identifiants ou réessayez plus tard.");
+    } finally {
+      setSubmitting(false);
     }
-  };
+  }
 
   return (
     <div className="login-container">
-      <form className="login-form" onSubmit={handleLogin}>
-        <h2>Connexion Admin</h2>
-
-        {error && <p className="error-message">{error}</p>}
-
-        <input
-          type="text"
-          placeholder="Nom d'utilisateur"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-        />
-
-        <input
-          type="password"
-          placeholder="Mot de passe"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-
-        <button type="submit">Se connecter</button>
+      <form className="login-form" onSubmit={handleSubmit} noValidate>
+        <h2>Connexion administrateur</h2>
+        {error && <p className="error-message" role="alert">{error}</p>}
+        <label htmlFor="username">Nom d’utilisateur</label>
+        <input id="username" name="username" type="text" autoComplete="username" value={username}
+          onChange={event => setUsername(event.target.value)} required minLength={3} maxLength={80} />
+        <label htmlFor="password">Mot de passe</label>
+        <input id="password" name="password" type="password" autoComplete="current-password" value={password}
+          onChange={event => setPassword(event.target.value)} required maxLength={128} />
+        <button type="submit" disabled={submitting || !username.trim() || !password}>
+          {submitting ? "Connexion…" : "Se connecter"}
+        </button>
       </form>
     </div>
   );
 }
-
-export default Login;
-
