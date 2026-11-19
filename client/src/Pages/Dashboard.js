@@ -32,7 +32,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     // Récupérer les statistiques des provinces
-    Axios.get("http://localhost:3001/stats/provinces")
+    Axios.get("stats/provinces")
       .then((res) => {
         const data = res.data;
         const mergedStats = {};
@@ -60,7 +60,7 @@ const Dashboard = () => {
       });
 
     // Récupérer les utilisateurs
-    Axios.get("http://localhost:3001/users")
+    Axios.get("users")
       .then((res) => {
         setUsers(res.data || []);
       })
