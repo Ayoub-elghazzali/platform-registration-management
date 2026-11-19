@@ -38,7 +38,7 @@ jobs:
       - name: Verify React Router dependency
         run: node -e "console.log(require.resolve('react-router-dom'))"
       - name: Run frontend authentication tests
-        run: CI=true npm test -- --watchAll=false
+        run: npm test
       - name: Build production frontend
         if: always()
         run: npm run build
