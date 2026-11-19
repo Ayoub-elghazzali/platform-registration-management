@@ -22,6 +22,9 @@ const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:3000')
 if (isProduction && !process.env.CLIENT_ORIGINS) {
   throw new Error('CLIENT_ORIGINS must be configured in production.');
 }
+if (isProduction && !process.env.AUDIT_IP_HASH_KEY) {
+  throw new Error('AUDIT_IP_HASH_KEY must be configured in production.');
+}
 if (isProduction && !process.env.COOKIE_SECURE) {
   // Secure cookies are mandatory in production; this guard prevents accidental HTTP deployment.
   process.env.COOKIE_SECURE = 'true';
@@ -107,7 +110,7 @@ async function writeAudit(event, req, actorId = null, targetId = null) {
       event,
       actorId: actorId || null,
       targetId: targetId ? String(targetId) : null,
-      ipHash: req.ip ? sha256(req.ip) : null
+      ipHash: req.ip ? crypto.createHmac('sha256', process.env.AUDIT_IP_HASH_KEY || 'development-only-audit-hash-key').update(req.ip).digest('hex') : null
     });
   } catch (_) {
     // Audit persistence failures must not leak request data or break authentication flows.
