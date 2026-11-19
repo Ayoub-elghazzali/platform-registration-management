@@ -11,6 +11,16 @@ const DASHBOARD_BY_ROLE = {
   USER: "/"
 };
 
+const LEGACY_DASHBOARD = {
+  Director_Regional: "/DirectorRegional",
+  direction_regional: "/DirectorRegional",
+  director_regional: "/DirectorRegional",
+  president_regional: "/dashboardRegional",
+  director_provincial: "/DirectorProvincial",
+  direction_provincial: "/DirectorProvincial",
+  president_provincial: "/PresidentProvincial"
+};
+
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +35,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       const user = await login(username.trim(), password);
-      const destination = DASHBOARD_BY_ROLE[user.role];
+      const destination = LEGACY_DASHBOARD[user.legacyRole] || DASHBOARD_BY_ROLE[user.role];
       if (!destination || destination === "/") {
         setError("Ce compte ne possède pas d’espace administrateur.");
         return;
