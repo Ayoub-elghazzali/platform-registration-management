@@ -23,7 +23,7 @@
 
 ## Legacy password migration
 
-The API supports controlled on-login migration from the former plaintext `Admin.password` field. A password is hashed only after the submitted value matches the stored legacy value exactly. If it is incorrect, the legacy field is left unchanged. Legacy passwords shorter than the new policy are not automatically migrated and require an operator reset. See [RBAC.md](server/server/docs/RBAC.md), [authentication API documentation](server/server/docs/API.md), and the [migration runbook](server/server/docs/MIGRATION.md).
+The API supports controlled on-login migration from the former plaintext `Admin.password` field. A password is hashed only after the submitted value matches the stored legacy value exactly. If it is incorrect, the legacy field is left unchanged. Legacy passwords shorter than the new policy are not automatically migrated and require an operator reset. See [RBAC.md](server/server/docs/RBAC.md), [authentication API documentation](server/server/docs/API.md), the [Phase B.3 security audit](server/server/docs/SECURITY-AUDIT.md), and the [migration runbook](server/server/docs/MIGRATION.md).
 
 ## Initial administrator
 
