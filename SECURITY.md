@@ -14,7 +14,7 @@
 
 ## Deployment requirements
 
-1. Use HTTPS and set `NODE_ENV=production`, `COOKIE_SECURE=true`, and exact `CLIENT_ORIGINS`.
+1. Use HTTPS and set `NODE_ENV=production`, `COOKIE_SECURE=true`, exact `CLIENT_ORIGINS`, and a strong random `AUDIT_IP_HASH_KEY`.
 2. Use a least-privilege MongoDB account and a restricted network allowlist.
 3. Store environment values in a deployment secret manager; never commit `.env`.
 4. Back up the database before running operational migrations.
@@ -44,4 +44,4 @@ Do not publish credentials, personal data, database exports, session material, o
 
 ## Audit event privacy
 
-Authentication successes and failures, password migrations/changes, administrator creation/disablement, and logout events are stored as structured audit events. They contain event type, actor/target identifiers where available, timestamp, and a one-way hash of the client IP. They do not contain usernames, passwords, cookies, session identifiers, CSRF tokens, request bodies, or registration records. The `GET /security/audit` endpoint requires `settings:manage` and omits the IP hash from its response.
+Authentication successes and failures, password migrations/changes, administrator creation/disablement, and logout events are stored as structured audit events. They contain event type, actor/target identifiers where available, timestamp, and an HMAC of the client IP using `AUDIT_IP_HASH_KEY`. They do not contain usernames, passwords, cookies, session identifiers, CSRF tokens, request bodies, or registration records. The `GET /security/audit` endpoint requires `settings:manage` and omits the IP hash from its response.
