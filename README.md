@@ -1,34 +1,37 @@
 # Platform Registration Management
 
-A web application for managing administrative registration workflows with regional and provincial views. This repository began as an academic project and is being incrementally hardened into a maintainable full-stack application.
+Administrative registration management platform with role-based dashboards and geographic data scope. This repository is being hardened from an academic project into a maintainable full-stack application.
 
-> **Current maturity: development / security hardening in progress. Do not deploy this version with real personal data or expose its API to the public internet.**
+> **Security maturity: authentication and authorization implementation in progress. Do not use real personal data or deploy publicly until the CI suite has passed and the remaining operational controls have been completed.**
 
 ## Technology stack
 
 - **Frontend:** React 19, React Router, Axios, Recharts
 - **Backend:** Node.js, Express 5, Mongoose
 - **Database:** MongoDB
-- **Testing:** Node.js built-in test runner for backend configuration tests
+- **Authentication:** bcrypt password hashes, opaque server-side sessions, HttpOnly cookies, CSRF synchronizer tokens
+- **Security:** Helmet, restricted CORS, MongoDB operator-input rejection, request-size limits, server-side RBAC and geographic scoping
+- **Tests:** Node.js test runner, Supertest, MongoDB Memory Server
 
-## Repository layout
+## Repository structure
 
 ```text
-client/                 React application
-server/server/          Express API and MongoDB integration
-  config/database.js    Validated environment configuration
-  test/                 Backend unit tests
-  .env.example          Non-secret local configuration template
-SECURITY.md             Credential rotation and Git-history guidance
+client/                       React application
+server/server/
+  config/database.js          Environment-only MongoDB configuration
+  security/authorization.js   Role permissions and geographic scoping
+  security/passwords.js       bcrypt hashing and legacy migration checks
+  scripts/                    Initial admin provisioning and password reset
+  test/                       Unit and MongoDB-backed integration tests
+  docs/API.md                 Authentication and API reference
+  docs/RBAC.md                Roles, permissions and geographic boundaries
+  .env.example                Non-secret environment template
+SECURITY.md                   Security controls and operational limitations
 ```
 
-## Local development
+## Local setup
 
-### Requirements
-
-- Node.js 20 or newer
-- npm
-- MongoDB local instance or a MongoDB Atlas database user
+Requirements: Node.js 20+, npm, and a local MongoDB instance or a dedicated test/development database.
 
 ### Backend
 
@@ -38,19 +41,23 @@ npm install
 cp .env.example .env
 ```
 
-Set `MONGODB_URI` in the untracked `.env` file. Use a local development database or a newly rotated, least-privilege database user. Never paste credentials into source code or commit `.env`.
+Configure `MONGODB_URI` in the untracked `.env` file. Never use production credentials in local development.
 
-Start the API:
+Run the API:
 
 ```bash
 npm run dev
 ```
 
-Run the current backend unit tests:
+Run tests:
 
 ```bash
+npm run test:unit
+npm run test:integration
 npm test
 ```
+
+The integration suite creates an isolated in-memory MongoDB instance. It does not connect to the configured application database.
 
 ### Frontend
 
@@ -60,25 +67,57 @@ npm install
 npm start
 ```
 
-The existing frontend currently targets the local API at `http://localhost:3001`. Configurable frontend API origins and authenticated API integration are part of the ongoing hardening work.
+Set `REACT_APP_API_URL` when the API is not running at `http://localhost:3001`. The browser sends credentials using cookies; it does not persist authentication tokens in localStorage.
 
-## Existing application areas
+## Authentication architecture
 
-The current codebase includes registration forms, administrator login screens, administrative dashboards, regional/provincial views, registration status operations, and province statistics. These areas are not yet uniformly protected by a complete authorization model.
+The API uses opaque random server-side sessions instead of browser-stored JWTs. Only a SHA-256 digest of the session identifier is stored in MongoDB. The browser receives an HttpOnly, SameSite cookie, Secure in production. Authenticated write requests require a CSRF token in `X-CSRF-Token`. Sessions expire after eight hours and can be renewed or revoked.
 
-## Security status and limitations
+New administrator passwords are bcrypt-hashed (default cost 12). Legacy plaintext credentials are migrated only after exact successful verification; the old field is then removed. Legacy passwords that do not satisfy the new policy require an operator reset.
 
-- The hard-coded MongoDB connection strings were removed from the current server source. The application now requires `MONGODB_URI`.
-- A secret that has appeared in a public Git commit must be considered compromised even after removal from the current file. **Rotate or revoke the exposed database user immediately.** See [SECURITY.md](SECURITY.md).
-- The legacy administrator model and login flow still require a password-hashing migration and secure token/session implementation.
-- Administrative routes still require complete authentication and role-based authorization coverage.
-- Input validation, API error handling, audit logging, rate limiting, API documentation, and broader integration tests remain in the hardening backlog.
-- Do not use real identity documents, personal information, or production records in development or demonstrations.
+## Initial super administrator
 
-## Test coverage
+Create the first super administrator from the backend directory. Set secrets in the process environment; do not place them in source code or command-line arguments.
 
-The current automated backend tests cover required MongoDB environment configuration. They do not yet constitute end-to-end, database integration, authorization, or frontend coverage.
+macOS/Linux example:
 
-## Contribution and responsible disclosure
+```bash
+export ADMIN_USERNAME="your-admin-login"
+read -s ADMIN_PASSWORD
+export ADMIN_PASSWORD
+npm run admin:create
+unset ADMIN_PASSWORD
+```
 
-Do not commit credentials, real personal data, database exports, or production logs. Report security issues privately to the repository owner rather than publishing exploit details.
+For an operator-assisted reset:
+
+```bash
+export RESET_ADMIN_USERNAME="your-admin-login"
+read -s RESET_ADMIN_PASSWORD
+export RESET_ADMIN_PASSWORD
+npm run admin:reset
+unset RESET_ADMIN_PASSWORD
+```
+
+The reset command revokes all existing sessions for that account.
+
+## Authorization
+
+See [Role and Permission Model](server/server/docs/RBAC.md) and [Authentication API](server/server/docs/API.md). Server-side authorization is authoritative; frontend route guards are only a usability layer. Regional and provincial access is derived from the authenticated administrator record, never from localStorage or a client-supplied role.
+
+## CI
+
+GitHub Actions includes a backend unit/integration test workflow and a frontend production-build workflow. Check the Actions tab for actual execution results; a workflow file existing in the repository does not itself prove that a run passed.
+
+## Current limitations
+
+- Login throttling currently uses process-local memory. Use a shared Redis or MongoDB rate-limit store before horizontal scaling.
+- Email-based password recovery, MFA, persistent security audit events, and alerting are not yet implemented.
+- The current role model reflects the legacy application's known roles. It requires owner review against the real administrative hierarchy before production use.
+- Existing legacy administrators must be migrated through successful login or reset using the documented operator procedure.
+- The frontend contains legacy screens and data displays that still require broader regression testing.
+- Do not use actual identity documents or real personal records in demonstrations.
+
+## Security
+
+See [SECURITY.md](SECURITY.md). Report security issues privately to the repository owner. Never commit passwords, cookies, tokens, database URIs, or personal data.
