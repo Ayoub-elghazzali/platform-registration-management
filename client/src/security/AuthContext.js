@@ -32,6 +32,12 @@ export function AuthProvider({ children }) {
     return response.data.user;
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    const response = await axios.post("/auth/refresh");
+    setCsrfToken(response.data.csrfToken);
+    return response.data;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await axios.post("/auth/logout");
@@ -41,7 +47,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const value = useMemo(() => ({ user, loading, login, logout, refresh }), [user, loading, login, logout, refresh]);
+  const value = useMemo(() => ({ user, loading, login, logout, refresh, refreshSession }), [user, loading, login, logout, refresh, refreshSession]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
