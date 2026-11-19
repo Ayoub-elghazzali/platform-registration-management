@@ -1,12 +1,13 @@
+import { vi } from "vitest";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import ProtectedRoute from "./ProtectedRoute";
 import { useAuth } from "./AuthContext";
 
-jest.mock("react-router-dom", () => ({
+vi.mock("react-router-dom", () => ({
   Navigate: () => <p>Login screen</p>
-}), { virtual: true });
-jest.mock("./AuthContext", () => ({ useAuth: jest.fn() }));
+}));
+vi.mock("./AuthContext", () => ({ useAuth: vi.fn() }));
 
 function renderGuard(user) {
   useAuth.mockReturnValue({ user, loading: false });
