@@ -1,20 +1,21 @@
+import { vi } from "vitest";
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import Login from "./Login";
 import { useAuth } from "../security/AuthContext";
 import { useNavigate } from "react-router-dom";
 
-jest.mock("react-router-dom", () => ({ useNavigate: jest.fn() }), { virtual: true });
-jest.mock("../security/AuthContext", () => ({ useAuth: jest.fn() }));
+vi.mock("react-router-dom", () => ({ useNavigate: vi.fn() }));
+vi.mock("../security/AuthContext", () => ({ useAuth: vi.fn() }));
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   useNavigate.mockReturnValue(mockNavigate);
 });
 
 test("login displays a safe API authentication error", async () => {
-  const mockLogin = jest.fn().mockRejectedValue({
+  const mockLogin = vi.fn().mockRejectedValue({
     response: { status: 401, data: { error: "Identifiants incorrects." } }
   });
   useAuth.mockReturnValue({ login: mockLogin });
@@ -27,7 +28,7 @@ test("login displays a safe API authentication error", async () => {
 });
 
 test("successful login redirects a super administrator to its dashboard", async () => {
-  const mockLogin = jest.fn().mockResolvedValue({ role: "SUPER_ADMIN" });
+  const mockLogin = vi.fn().mockResolvedValue({ role: "SUPER_ADMIN" });
   useAuth.mockReturnValue({ login: mockLogin });
   render(<Login />);
   fireEvent.change(screen.getByLabelText(/nom d’utilisateur/i), { target: { value: "test-admin" } });
