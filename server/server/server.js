@@ -246,7 +246,7 @@ app.get('/', (req, res) => res.json({ status: 'ok', service: 'Platform Registrat
 async function loginHandler(req, res, next) {
   try {
     const { username, password } = req.body || {};
-    if (!validText(username, 2, 80) || typeof password !== 'string' || password.length < 1 || Buffer.byteLength(password, 'utf8') > 72) {
+    if (!validText(username, 2, 80) || typeof password !== 'string' || password.length < 1 || password.length > 128) {
       return res.status(400).json({ error: 'Identifiants invalides.' });
     }
     const admin = await Admin.findOne({ username: username.trim().toLowerCase() }).select('+password +passwordHash');
