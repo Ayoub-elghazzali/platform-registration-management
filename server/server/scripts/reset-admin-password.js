@@ -19,6 +19,7 @@ async function main() {
   if (!result.matchedCount) throw new Error('Administrator not found.');
   const admin = await models.Admin.findOne({ username });
   await models.Session.deleteMany({ adminId: admin._id });
+  await models.AuditEvent.create({ event: 'admin.password.reset', targetId: String(admin._id) });
   console.log(`Password reset completed for administrator: ${username}. All sessions were revoked.`);
 }
 
