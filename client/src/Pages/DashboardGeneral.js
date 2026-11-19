@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "../security/api";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../security/AuthContext";
 import "./DashboardGeneral.css";
 
 function DashboardGeneral() {
@@ -10,6 +11,7 @@ function DashboardGeneral() {
   const [showRegion, setShowRegion] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const provinces = [
     "Province de Marrakech", "Province d'Al Haouz", "Province de Chichaoua",
@@ -82,7 +84,7 @@ function DashboardGeneral() {
                 setShowRegion(value.includes("regional"));
               }}>
                 <option value="">Sélectionner un rôle</option>
-                <option value="ADMIN">ADMIN</option>
+                {user?.role === "SUPER_ADMIN" && <option value="ADMIN">ADMIN</option>}
                 <option value="REGIONAL_ADMIN">REGIONAL_ADMIN</option>
                 <option value="PROVINCIAL_ADMIN">PROVINCIAL_ADMIN</option>
               </select>
