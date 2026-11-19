@@ -10,19 +10,42 @@ on:
       - "server/server/**"
       - ".github/workflows/server-tests.yml"
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server/server
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Install backend dependencies
-        working-directory: server/server
-        run: npm install
-      - name: Run unit and integration tests
-        working-directory: server/server
+          cache: npm
+          cache-dependency-path: server/server/package-lock.json
+      - name: Reconcile stale lockfile with declared dependencies
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Install backend dependencies from lockfile
+        run: npm ci
+      - name: Run backend unit and MongoDB integration tests
         run: npm test
+      - name: Validate backend syntax/build
+        if: always()
+        run: npm run build
+      - name: Audit backend dependencies
+        if: always()
+        run: |
+          npm audit --json > npm-audit.json || true
+          node -e "const a=require('./npm-audit.json'); const v=a.metadata?.vulnerabilities||{}; console.log(JSON.stringify(v)); if ((v.high||0)+(v.critical||0)>0) process.exit(1)"
+      - name: Upload backend dependency audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-npm-audit
+          path: server/server/npm-audit.json
+          if-no-files-found: ignore
