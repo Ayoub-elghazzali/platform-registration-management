@@ -135,6 +135,54 @@ test('legacy password is not migrated when the supplied value is incorrect', asy
   assert.equal(unchanged.passwordHash, undefined);
 });
 
+
+test('authenticated writes require a CSRF token', async () => {
+  await createAdmin('csrf-admin');
+  const { agent } = await signIn('csrf-admin');
+  const response = await agent.post('/addField').send({ type: 'province', name: 'Test Province' });
+  assert.equal(response.status, 403);
+});
+
+test('session renewal rotates the session and CSRF token', async () => {
+  await createAdmin('renew-admin');
+  const { agent, csrfToken } = await signIn('renew-admin');
+  const renewed = await agent.post('/auth/refresh').set('X-CSRF-Token', csrfToken);
+  assert.equal(renewed.status, 200);
+  assert.ok(renewed.body.csrfToken);
+  assert.notEqual(renewed.body.csrfToken, csrfToken);
+  const me = await agent.get('/auth/me');
+  assert.equal(me.status, 200);
+});
+
+test('regional administrator cannot read records from another region', async () => {
+  await createAdmin('regional-admin', 'REGIONAL_ADMIN', { region: 'Marrakech-Safi' });
+  await models.User.create([
+    { nom: 'Demo', prenom: 'Marrakech', province: 'Marrakech', region: 'Marrakech-Safi' },
+    { nom: 'Demo', prenom: 'Agadir', province: 'Agadir', region: 'Souss-Massa' }
+  ]);
+  const { agent } = await signIn('regional-admin');
+  const response = await agent.get('/users?region=Souss-Massa');
+  assert.equal(response.status, 403);
+  const allowed = await agent.get('/users');
+  assert.equal(allowed.status, 200);
+  assert.ok(allowed.body.every(user => user.region === 'Marrakech-Safi'));
+});
+
+test('password change requires current password and revokes existing session', async () => {
+  await createAdmin('change-password-admin');
+  const { agent, csrfToken } = await signIn('change-password-admin');
+  const changed = await agent.post('/auth/change-password')
+    .set('X-CSRF-Token', csrfToken)
+    .send({ currentPassword: 'Correct-Horse-2026!', newPassword: 'A-new-strong-password-2026!' });
+  assert.equal(changed.status, 200);
+  const me = await agent.get('/auth/me');
+  assert.equal(me.status, 401);
+  const relogin = await request(app).post('/auth/login').send({
+    username: 'change-password-admin', password: 'A-new-strong-password-2026!'
+  });
+  assert.equal(relogin.status, 200);
+});
+
 test('repeated login attempts are rate limited', async () => {
   await createAdmin('rate-limited-admin');
   for (let i = 0; i < 8; i += 1) {
