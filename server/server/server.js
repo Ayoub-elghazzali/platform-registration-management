@@ -44,7 +44,7 @@ app.use(express.json({ limit: '200kb', strict: true }));
 mongoose.set('sanitizeFilter', true);
 
 const adminSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true, trim: true, lowercase: true, maxlength: 80, index: true },
+  username: { type: String, required: true, trim: true, lowercase: true, maxlength: 80, index: true },
   passwordHash: { type: String, select: false },
   password: { type: String, select: false }, // Legacy plaintext field, removed after a verified successful login.
   role: { type: String, required: true, enum: ['SUPER_ADMIN', 'ADMIN', 'REGIONAL_ADMIN', 'PROVINCIAL_ADMIN', 'USER', 'admin', 'admin_general', 'president_regional', 'Director_Regional', 'director_regional', 'direction_regional', 'president_provincial', 'director_provincial', 'direction_provincial', 'user'] },
@@ -78,7 +78,7 @@ const fieldSchema = new mongoose.Schema({
   type: { type: String, enum: ['province', 'commune'], required: true },
   name: { type: String, required: true, trim: true, maxlength: 120 }
 }, { timestamps: true });
-fieldSchema.index({ type: 1, name: 1 }, { unique: true });
+fieldSchema.index({ type: 1, name: 1 });
 const Field = mongoose.models.Field || mongoose.model('Field', fieldSchema);
 
 const sessionSchema = new mongoose.Schema({
@@ -396,6 +396,8 @@ app.post('/addAdmin', requirePermission('admins:create'), async (req, res, next)
     if (req.admin.role !== 'SUPER_ADMIN' && normalizedRole === 'ADMIN') return res.status(403).json({ error: 'Création de ce rôle interdite.' });
     if (normalizedRole === 'PROVINCIAL_ADMIN' && !validText(province, 1, 120)) return res.status(400).json({ error: 'Province obligatoire.' });
     if (normalizedRole === 'REGIONAL_ADMIN' && !validText(region, 1, 120)) return res.status(400).json({ error: 'Région obligatoire.' });
+    const existingAdmin = await Admin.findOne({ username: username.trim().toLowerCase() });
+    if (existingAdmin) return res.status(409).json({ error: 'Ce nom d’utilisateur existe déjà.' });
     const passwordHash = await hashPassword(password);
     const admin = await Admin.create({
       username: username.trim().toLowerCase(), passwordHash, role: normalizedRole,
@@ -444,6 +446,8 @@ app.post('/addField', requirePermission('provinces:manage'), async (req, res, ne
   try {
     const { type, name } = req.body || {};
     if (!['province', 'commune'].includes(type) || !validText(name, 1, 120)) return res.status(400).json({ error: 'Champ invalide.' });
+    const existingField = await Field.findOne({ type, name: name.trim() });
+    if (existingField) return res.status(409).json({ error: 'Ce champ existe déjà.' });
     const field = await Field.create({ type, name: name.trim() });
     return res.status(201).json({ success: true, field });
   } catch (error) {
