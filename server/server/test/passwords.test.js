@@ -18,7 +18,7 @@ test('legacy plaintext is accepted only when the exact original value matches', 
 });
 
 test('hashing enforces the current password policy', async () => {
-  await assert.rejects(() => hashPassword('short'), /12 and 128/);
+  await assert.rejects(() => hashPassword('short'), /12 characters and at most 72 UTF-8 bytes/);
 });
 
 test('bcrypt verification rejects inputs beyond its 72-byte boundary', async () => {
