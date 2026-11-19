@@ -30,7 +30,7 @@ export default function App() {
         <Route path="/DirectorRegional" element={<Guard roles={["REGIONAL_ADMIN"]}><DirectorRegional /></Guard>} />
         <Route path="/PresidentProvincial" element={<Guard roles={["PROVINCIAL_ADMIN"]}><PresidentProvincial /></Guard>} />
         <Route path="/DirectorProvincial" element={<Guard roles={["PROVINCIAL_ADMIN"]}><DirectorProvincial /></Guard>} />
-        <Route path="/provinceStats" element={<Guard roles={["SUPER_ADMIN", "ADMIN", "REGIONAL_ADMIN", "PROVINCIAL_ADMIN"]}><ProvinceStats /></Guard>} />
+        <Route path="/provinceStats" element={<Guard roles={["SUPER_ADMIN", "ADMIN", "PROVINCIAL_ADMIN"]}><ProvinceStats /></Guard>} />
       </Routes>
     </>
   );
