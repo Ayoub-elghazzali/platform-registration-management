@@ -11,7 +11,8 @@
     "test:integration": "node --test test/auth.integration.test.js",
     "admin:create": "node scripts/create-super-admin.js",
     "admin:reset": "node scripts/reset-admin-password.js",
-    "admin:scope": "node scripts/assign-admin-scope.js"
+    "admin:scope": "node scripts/assign-admin-scope.js",
+    "build": "node --check server.js && node --check security/authorization.js && node --check security/passwords.js && node --check config/database.js && node --check scripts/create-super-admin.js && node --check scripts/reset-admin-password.js && node --check scripts/assign-admin-scope.js"
   },
   "keywords": [],
   "author": "",
