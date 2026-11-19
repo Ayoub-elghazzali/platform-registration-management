@@ -30,6 +30,7 @@ The legacy `POST /loginAdmin` path is retained as a compatibility alias and uses
 | POST | `/validateDecision/:userId` | `registrations:validate` + geographic scope |
 | GET | `/acceptedUsers`, `/finalAccepted` | `registrations:read` + geographic scope |
 | GET | `/stats/provinces` | `statistics:read` + geographic scope |
+| GET | `/security/audit` | `settings:manage` |
 | GET | `/admins` | `admins:read` |
 | POST | `/addAdmin` | `admins:create` |
 | DELETE | `/deleteAdmin/:username` | `admins:disable` |
@@ -47,3 +48,7 @@ A legacy plaintext credential is migrated only after exact successful verificati
 ## Operational limitations
 
 The login attempt limiter is currently process-local (8 attempts per account and 30 per IP in a 15-minute window). It protects a single Node.js process but is not shared across multiple instances or restarts; production horizontal scaling must move this counter to a shared Redis or MongoDB-backed rate-limit store. Session records are MongoDB-backed and have a TTL index. Configure TLS at the edge and restrict database network access.
+
+## Security audit events
+
+Authentication successes/failures, legacy password migrations, password changes, administrator creation, administrator disablement, and logout events are recorded in MongoDB. Events store the event type, administrator ObjectId where known, target ObjectId where relevant, timestamp, and a one-way hash of the client IP. They do not store usernames, passwords, cookies, session identifiers, CSRF tokens, request bodies, or registration data. The audit endpoint intentionally omits the IP hash from its response.
