@@ -143,24 +143,35 @@ function rejectMongoOperators(value, depth = 0) {
 const loginAttempts = new Map();
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 8;
-function loginRateLimit(req, res, next) {
+const LOGIN_IP_MAX_ATTEMPTS = 30;
+function loginAttemptKeys(req) {
   const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
-  const key = sha256(`${req.ip}:${username}`);
+  return [sha256(`ip:${req.ip}`), sha256(`account:${username}`)];
+}
+function loginRateLimit(req, res, next) {
   const now = Date.now();
-  const entry = loginAttempts.get(key);
-  if (entry && entry.resetAt > now && entry.count >= LOGIN_MAX_ATTEMPTS) {
+  const [ipKey, accountKey] = loginAttemptKeys(req);
+  const ipEntry = loginAttempts.get(ipKey);
+  const accountEntry = loginAttempts.get(accountKey);
+  if ((ipEntry && ipEntry.resetAt > now && ipEntry.count >= LOGIN_IP_MAX_ATTEMPTS) ||
+      (accountEntry && accountEntry.resetAt > now && accountEntry.count >= LOGIN_MAX_ATTEMPTS)) {
     return res.status(429).json({ error: 'Trop de tentatives. Réessayez dans quelques minutes.' });
   }
-  if (!entry || entry.resetAt <= now) loginAttempts.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
-  else entry.count += 1;
+  for (const key of [ipKey, accountKey]) {
+    const entry = loginAttempts.get(key);
+    if (!entry || entry.resetAt <= now) loginAttempts.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+    else entry.count += 1;
+  }
   if (loginAttempts.size > 5000) {
-    for (const [k, v] of loginAttempts) if (v.resetAt <= now) loginAttempts.delete(k);
+    for (const [key, value] of loginAttempts) {
+      if (value.resetAt <= now) loginAttempts.delete(key);
+      if (loginAttempts.size <= 4000) break;
+    }
   }
   return next();
 }
 function resetLoginAttempts(req) {
-  const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
-  loginAttempts.delete(sha256(`${req.ip}:${username}`));
+  for (const key of loginAttemptKeys(req)) loginAttempts.delete(key);
 }
 
 function requireSameOrigin(req, res, next) {
@@ -234,7 +245,7 @@ app.get('/', (req, res) => res.json({ status: 'ok', service: 'Platform Registrat
 async function loginHandler(req, res, next) {
   try {
     const { username, password } = req.body || {};
-    if (!validText(username, 2, 80) || typeof password !== 'string' || password.length < 1 || password.length > 128) {
+    if (!validText(username, 2, 80) || typeof password !== 'string' || password.length < 1 || Buffer.byteLength(password, 'utf8') > 72) {
       return res.status(400).json({ error: 'Identifiants invalides.' });
     }
     const admin = await Admin.findOne({ username: username.trim().toLowerCase() }).select('+password +passwordHash');
@@ -410,7 +421,7 @@ app.delete('/deleteAdmin/:username', requirePermission('admins:disable'), async 
     const target = await Admin.findOne({ username: req.params.username.toLowerCase() });
     if (!target) return res.status(404).json({ error: 'Administrateur introuvable.' });
     if (String(target._id) === req.admin.id) return res.status(400).json({ error: 'Vous ne pouvez pas désactiver votre propre compte.' });
-    if (normalizeRole(target.role) === 'SUPER_ADMIN' && req.admin.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Action interdite.' });
+    if (['SUPER_ADMIN', 'ADMIN'].includes(normalizeRole(target.role)) && req.admin.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Seul le super administrateur peut désactiver un compte administrateur global.' });
     target.isActive = false;
     await target.save();
     await Session.deleteMany({ adminId: target._id });
