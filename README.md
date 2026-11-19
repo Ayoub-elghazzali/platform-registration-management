@@ -10,7 +10,7 @@ Administrative registration management platform with role-based dashboards and g
 - **Backend:** Node.js, Express 5, Mongoose
 - **Database:** MongoDB
 - **Authentication:** bcrypt password hashes, opaque server-side sessions, HttpOnly cookies, CSRF synchronizer tokens
-- **Security:** Helmet, restricted CORS, MongoDB operator-input rejection, request-size limits, server-side RBAC and geographic scoping
+- **Security:** Helmet, restricted CORS, MongoDB operator-input rejection, request-size limits, server-side RBAC, geographic scoping and privacy-minimized audit events
 - **Tests:** Node.js test runner, Supertest, MongoDB Memory Server
 
 ## Repository structure
@@ -21,7 +21,7 @@ server/server/
   config/database.js          Environment-only MongoDB configuration
   security/authorization.js   Role permissions and geographic scoping
   security/passwords.js       bcrypt hashing and legacy migration checks
-  scripts/                    Initial admin provisioning and password reset
+  scripts/                    Admin provisioning, reset and geographic scope assignment
   test/                       Unit and MongoDB-backed integration tests
   docs/API.md                 Authentication and API reference
   docs/RBAC.md                Roles, permissions and geographic boundaries
@@ -99,7 +99,9 @@ npm run admin:reset
 unset RESET_ADMIN_PASSWORD
 ```
 
-The reset command revokes all existing sessions for that account.
+The reset command revokes all existing sessions for that account and does not automatically reactivate a disabled account.
+
+For a legacy regional or provincial administrator missing its geographic scope, use `npm run admin:scope` with `SCOPE_ADMIN_USERNAME` and either `SCOPE_ADMIN_REGION` or `SCOPE_ADMIN_PROVINCE`. Verify the assignment before granting access.
 
 ## Authorization
 
@@ -111,8 +113,8 @@ GitHub Actions includes a backend unit/integration test workflow and a frontend 
 
 ## Current limitations
 
-- Login throttling currently uses process-local memory. Use a shared Redis or MongoDB rate-limit store before horizontal scaling.
-- Email-based password recovery, MFA, persistent security audit events, and alerting are not yet implemented.
+- Login throttling currently uses process-local memory (8 attempts per account and 30 per IP per 15 minutes). Use a shared Redis or MongoDB rate-limit store before horizontal scaling.
+- Email-based password recovery, MFA, centralized SIEM forwarding, and alerting are not yet implemented.
 - The current role model reflects the legacy application's known roles. It requires owner review against the real administrative hierarchy before production use.
 - Existing legacy administrators must be migrated through successful login or reset using the documented operator procedure.
 - The frontend contains legacy screens and data displays that still require broader regression testing.
