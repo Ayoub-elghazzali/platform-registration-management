@@ -278,6 +278,55 @@ test('ordinary ADMIN cannot disable another global ADMIN', async () => {
   assert.equal(response.status, 403);
 });
 
+
+test('old CSRF token is rejected after session renewal', async () => {
+  await createAdmin('csrf-rotation-admin');
+  const { agent, csrfToken } = await signIn('csrf-rotation-admin');
+  const renewed = await agent.post('/auth/refresh').set('X-CSRF-Token', csrfToken);
+  assert.equal(renewed.status, 200);
+  const stale = await agent.post('/addField')
+    .set('X-CSRF-Token', csrfToken)
+    .send({ type: 'province', name: 'Stale CSRF Province' });
+  assert.equal(stale.status, 403);
+  const current = await agent.post('/addField')
+    .set('X-CSRF-Token', renewed.body.csrfToken)
+    .send({ type: 'province', name: 'Current CSRF Province' });
+  assert.equal(current.status, 201);
+});
+
+test('provincial administrator cannot modify or validate a different province dossier', async () => {
+  await createAdmin('province-write-admin', 'PROVINCIAL_ADMIN', { province: 'Marrakech' });
+  const other = await models.User.create({
+    nom: 'Fictif', prenom: 'Safi', province: 'Safi', region: 'Marrakech-Safi', status: 'en attente'
+  });
+  const { agent, csrfToken } = await signIn('province-write-admin');
+  const update = await agent.post(`/users/${other._id}/status`)
+    .set('X-CSRF-Token', csrfToken).send({ status: 'accepté' });
+  assert.equal(update.status, 403);
+  const validate = await agent.post(`/validateDecision/${other._id}`)
+    .set('X-CSRF-Token', csrfToken).send({});
+  assert.equal(validate.status, 403);
+  const unchanged = await models.User.findById(other._id);
+  assert.equal(unchanged.status, 'en attente');
+  assert.notEqual(unchanged.validatedByDirectorRegional, true);
+});
+
+test('account without geographic scope cannot query registration data', async () => {
+  await createAdmin('unscoped-province-admin', 'PROVINCIAL_ADMIN');
+  const { agent } = await signIn('unscoped-province-admin');
+  const response = await agent.get('/users');
+  assert.equal(response.status, 403);
+});
+
+test('administrator cannot create a SUPER_ADMIN through the public admin endpoint', async () => {
+  const { agent, csrfToken } = await signIn('root-admin');
+  const response = await agent.post('/addAdmin')
+    .set('X-CSRF-Token', csrfToken)
+    .send({ username: 'injected-super', password: 'A-strong-password-2026!', role: 'SUPER_ADMIN' });
+  assert.equal(response.status, 400);
+  assert.equal(await models.Admin.findOne({ username: 'injected-super' }), null);
+});
+
 test('repeated login attempts are rate limited', async () => {
   await createAdmin('rate-limited-admin');
   for (let i = 0; i < 8; i += 1) {
