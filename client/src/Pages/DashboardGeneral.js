@@ -102,7 +102,8 @@ function DashboardGeneral() {
               {adminList.map(admin => <li key={admin.id || admin._id}>
                 <strong>{admin.username}</strong> · {admin.role} · {admin.isActive ? "Actif" : "Désactivé"}
                 {admin.province && ` · ${admin.province}`}
-                <button type="button" disabled={!admin.isActive} onClick={() => handleDelete(admin.username)}>Désactiver</button>
+                {(admin.role !== "SUPER_ADMIN" && admin.id !== user?.id && (user?.role === "SUPER_ADMIN" || admin.role !== "ADMIN")) &&
+                  <button type="button" disabled={!admin.isActive} onClick={() => handleDelete(admin.username)}>Désactiver</button>}
               </li>)}
             </ul>}
           </div>
