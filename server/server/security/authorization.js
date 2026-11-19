@@ -9,9 +9,11 @@ const ROLE_ALIASES = Object.freeze({
   president_regional: 'REGIONAL_ADMIN',
   Director_Regional: 'REGIONAL_ADMIN',
   director_regional: 'REGIONAL_ADMIN',
+  direction_regional: 'REGIONAL_ADMIN',
   PROVINCIAL_ADMIN: 'PROVINCIAL_ADMIN',
   president_provincial: 'PROVINCIAL_ADMIN',
   director_provincial: 'PROVINCIAL_ADMIN',
+  direction_provincial: 'PROVINCIAL_ADMIN',
   USER: 'USER',
   user: 'USER'
 });
