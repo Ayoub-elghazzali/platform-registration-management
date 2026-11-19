@@ -28,7 +28,8 @@ async function verifyPassword(password, admin) {
     return { valid: await bcrypt.compare(password, admin.passwordHash), needsMigration: false };
   }
   if (typeof admin.password === 'string' && admin.password.length > 0) {
-    return { valid: safeEqual(password, admin.password), needsMigration: true };
+    const valid = safeEqual(password, admin.password);
+    return { valid, needsMigration: valid };
   }
   return { valid: false, needsMigration: false };
 }
