@@ -34,7 +34,7 @@ For legacy regional/provincial accounts with missing scope, assign the verified 
 ## Known limitations
 
 - The login attempt limiter currently uses in-process memory (8 attempts per account and 30 per IP per 15-minute window); use a shared store for multi-instance deployments.
-- Email-based password recovery, MFA, account lockout notifications, centralized audit event storage, and formal security monitoring are not implemented.
+- Email-based password recovery, MFA, account lockout notifications, centralized SIEM forwarding, and formal security monitoring are not implemented.
 - The current integration suite uses an isolated in-memory MongoDB test database; it does not validate production configuration or deployment infrastructure.
 - Historical credentials may remain in older Git commits. Treat any previously public secret as compromised and rotate it. History rewriting is not performed automatically.
 
