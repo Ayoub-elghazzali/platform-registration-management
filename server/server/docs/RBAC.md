@@ -8,7 +8,7 @@ All permissions are enforced by the API. Frontend route guards are usability con
 | `ADMIN` | `admin` | Global operational administration, subordinate accounts |
 | `REGIONAL_ADMIN` | `president_regional`, `Director_Regional`, `direction_regional` | Records whose `region` exactly matches the administrator |
 | `PROVINCIAL_ADMIN` | `president_provincial`, `director_provincial`, `direction_provincial` | Records whose `province` exactly matches the administrator |
-| `USER` | `user` | Own registration/profile capabilities; no administrative access |
+| `USER` | `user` | Reserved for end-user identity; no end-user login/profile API is implemented yet |
 
 ## Permission catalogue
 
@@ -31,3 +31,16 @@ Only an authenticated administrator with `admins:create` can create subordinate 
 ## Legacy account migration
 
 On a successful login, a legacy plaintext password is compared with the exact submitted value using a constant-time comparison. Only after a successful match is it hashed with bcrypt and the legacy `password` field unset. Incorrect values are never migrated. A legacy password shorter than the current 12-character policy is verified but is not automatically upgraded; the account must be reset by an authorized operator. Disabled accounts cannot authenticate.
+
+## Assigning geographic scope to existing administrators
+
+Legacy regional/provincial administrator records may not contain a `region` or `province` value. Such accounts fail closed and cannot access geographically scoped data until an operator assigns the correct scope. From `server/server`, set the values in the process environment and run:
+
+```bash
+export SCOPE_ADMIN_USERNAME="legacy-admin"
+export SCOPE_ADMIN_REGION="Marrakech-Safi"
+npm run admin:scope
+unset SCOPE_ADMIN_USERNAME SCOPE_ADMIN_REGION
+```
+
+For a provincial administrator, use `SCOPE_ADMIN_PROVINCE` instead. Confirm the assignment against the organization's authoritative administrative hierarchy before allowing the account to use the application.
