@@ -184,13 +184,18 @@ function loginRateLimit(req, res, next) {
   }
   for (const key of [ipKey, accountKey]) {
     const entry = loginAttempts.get(key);
-    if (!entry || entry.resetAt <= now) loginAttempts.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
-    else entry.count += 1;
+    const updated = !entry || entry.resetAt <= now
+      ? { count: 1, resetAt: now + LOGIN_WINDOW_MS }
+      : { count: entry.count + 1, resetAt: entry.resetAt };
+    loginAttempts.delete(key);
+    loginAttempts.set(key, updated);
   }
   if (loginAttempts.size > 5000) {
-    for (const [key, value] of loginAttempts) {
-      if (value.resetAt <= now) loginAttempts.delete(key);
-      if (loginAttempts.size <= 4000) break;
+    let removeCount = loginAttempts.size - 4000;
+    for (const key of loginAttempts.keys()) {
+      loginAttempts.delete(key);
+      removeCount -= 1;
+      if (removeCount <= 0) break;
     }
   }
   return next();
