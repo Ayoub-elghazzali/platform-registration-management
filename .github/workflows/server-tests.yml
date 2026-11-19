@@ -1,4 +1,4 @@
-name: Backend tests
+name: Backend security tests
 
 on:
   push:
@@ -23,6 +23,6 @@ jobs:
       - name: Install backend dependencies
         working-directory: server/server
         run: npm install
-      - name: Run backend unit tests
+      - name: Run unit and integration tests
         working-directory: server/server
         run: npm test
