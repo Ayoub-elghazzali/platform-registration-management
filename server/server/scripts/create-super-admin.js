@@ -17,6 +17,7 @@ async function main() {
   if (existing) throw new Error('An active super administrator already exists. Use the controlled reset procedure instead.');
   const passwordHash = await hashPassword(password);
   const admin = await models.Admin.create({ username, passwordHash, role: 'SUPER_ADMIN', isActive: true });
+  await models.AuditEvent.create({ event: 'admin.created.initial', actorId: admin._id, targetId: String(admin._id) });
   console.log(`Created initial super administrator: ${admin.username}`);
 }
 
