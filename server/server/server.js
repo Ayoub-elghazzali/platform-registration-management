@@ -121,6 +121,7 @@ function publicAdmin(admin) {
     id: String(admin._id),
     username: admin.username,
     role: normalizeRole(admin.role),
+    legacyRole: admin.role,
     region: admin.region || null,
     province: admin.province || null,
     isActive: admin.isActive !== false
