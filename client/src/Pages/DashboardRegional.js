@@ -6,7 +6,7 @@ function DashboardRegional() {
 
   useEffect(() => {
     axios
-      .get("http://localhost:3001/finalAccepted") // On ne filtre pas par région ici
+      .get("finalAccepted") // On ne filtre pas par région ici
       .then((res) => setUsers(res.data))
       .catch((err) => console.error("Erreur :", err));
   }, []);
