@@ -11,7 +11,7 @@ async function main() {
   const password = process.env.ADMIN_PASSWORD;
   if (!username || !password) throw new Error('Set ADMIN_USERNAME and ADMIN_PASSWORD in the process environment.');
   await mongoose.connect(getMongoUri());
-  const existing = await models.Admin.findOne({ role: { $in: ['SUPER_ADMIN', 'admin_general'] }, isActive: true });
+  const existing = await models.Admin.findOne({ role: mongoose.trusted({ $in: ['SUPER_ADMIN', 'admin_general'] }), isActive: mongoose.trusted({ $ne: false }) });
   if (existing) throw new Error('An active super administrator already exists. Use the controlled reset procedure instead.');
   const passwordHash = await hashPassword(password);
   const admin = await models.Admin.create({ username, passwordHash, role: 'SUPER_ADMIN', isActive: true });
