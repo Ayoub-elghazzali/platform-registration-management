@@ -23,7 +23,15 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+    const handleExpired = () => {
+      setUser(null);
+      setCsrfToken(null);
+    };
+    window.addEventListener("auth:expired", handleExpired);
+    return () => window.removeEventListener("auth:expired", handleExpired);
+  }, [refresh]);
 
   const login = useCallback(async (username, password) => {
     const response = await axios.post("/auth/login", { username, password });
