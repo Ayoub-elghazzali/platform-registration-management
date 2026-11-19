@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { useNavigate } from "react-router-dom";
+import { useAuth } from "../security/AuthContext";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import "./Dashboard.css";
@@ -20,7 +20,7 @@ const Dashboard = () => {
   const [users, setUsers] = useState([]);
   const [activePage, setActivePage] = useState("stats");
 
-  const navigate = useNavigate();
+  const { logout } = useAuth();
 
   // Fonction pour normaliser les noms des provinces
   const normalizeProvinceName = (name) => {
@@ -83,9 +83,9 @@ const Dashboard = () => {
   };
 
   // Fonction déconnexion
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/login");
+  const handleLogout = async () => {
+    await logout();
+    window.location.assign("/login");
   };
 
   // Fonction pour télécharger badge en PDF
