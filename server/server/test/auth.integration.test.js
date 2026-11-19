@@ -361,6 +361,20 @@ test('isolated demo role matrix grants only the expected administrative permissi
   assert.equal(forbiddenGlobal.status, 403);
 });
 
+
+test('Helmet headers and CORS allow only configured browser origins', async () => {
+  const allowed = await request(app).get('/').set('Origin', 'http://localhost:3000');
+  assert.equal(allowed.status, 200);
+  assert.equal(allowed.headers['access-control-allow-origin'], 'http://localhost:3000');
+  assert.equal(allowed.headers['access-control-allow-credentials'], 'true');
+  assert.equal(allowed.headers['x-powered-by'], undefined);
+  assert.equal(allowed.headers['x-content-type-options'], 'nosniff');
+
+  const denied = await request(app).get('/').set('Origin', 'https://untrusted.example');
+  assert.equal(denied.status, 403);
+  assert.equal(denied.headers['access-control-allow-origin'], undefined);
+});
+
 test('repeated login attempts are rate limited', async () => {
   await createAdmin('rate-limited-admin');
   for (let i = 0; i < 8; i += 1) {
