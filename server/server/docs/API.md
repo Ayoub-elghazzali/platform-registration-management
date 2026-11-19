@@ -46,4 +46,4 @@ A legacy plaintext credential is migrated only after exact successful verificati
 
 ## Operational limitations
 
-The login attempt limiter is currently process-local. It protects a single Node.js process but is not shared across multiple instances or restarts; production horizontal scaling must move this counter to a shared Redis or MongoDB-backed rate-limit store. Session records are MongoDB-backed and have a TTL index. Configure TLS at the edge and restrict database network access.
+The login attempt limiter is currently process-local (8 attempts per account and 30 per IP in a 15-minute window). It protects a single Node.js process but is not shared across multiple instances or restarts; production horizontal scaling must move this counter to a shared Redis or MongoDB-backed rate-limit store. Session records are MongoDB-backed and have a TTL index. Configure TLS at the edge and restrict database network access.
