@@ -1,12 +1,13 @@
+import { vi } from "vitest";
 import React from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import axios, { setCsrfToken } from "./api";
 import { AuthProvider, useAuth } from "./AuthContext";
 
-jest.mock("./api", () => ({
+vi.mock("./api", () => ({
   __esModule: true,
-  default: { get: jest.fn(), post: jest.fn() },
-  setCsrfToken: jest.fn()
+  default: { get: vi.fn(), post: vi.fn() },
+  setCsrfToken: vi.fn()
 }));
 
 function Probe() {
@@ -22,7 +23,7 @@ function Probe() {
 }
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   axios.get.mockImplementation(async (url) => {
     if (url === "/auth/me") return { data: { user: null } };
     if (url === "/auth/csrf") return { data: { csrfToken: "initial-csrf" } };
