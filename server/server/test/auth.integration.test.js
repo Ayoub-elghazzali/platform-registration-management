@@ -327,6 +327,40 @@ test('administrator cannot create a SUPER_ADMIN through the public admin endpoin
   assert.equal(await models.Admin.findOne({ username: 'injected-super' }), null);
 });
 
+
+test('isolated demo role matrix grants only the expected administrative permissions', async () => {
+  await createAdmin('matrix-super', 'SUPER_ADMIN');
+  await createAdmin('matrix-admin', 'ADMIN');
+  await createAdmin('matrix-region', 'REGIONAL_ADMIN', { region: 'Marrakech-Safi' });
+  await createAdmin('matrix-province', 'PROVINCIAL_ADMIN', { province: 'Marrakech' });
+  await createAdmin('matrix-user', 'USER');
+
+  const cases = [
+    { username: 'matrix-super', users: 200, admins: 200 },
+    { username: 'matrix-admin', users: 200, admins: 200 },
+    { username: 'matrix-region', users: 200, admins: 403 },
+    { username: 'matrix-province', users: 200, admins: 403 },
+    { username: 'matrix-user', users: 403, admins: 403 }
+  ];
+
+  for (const scenario of cases) {
+    const { agent } = await signIn(scenario.username);
+    assert.equal((await agent.get('/users')).status, scenario.users, scenario.username + ' users permission');
+    assert.equal((await agent.get('/admins')).status, scenario.admins, scenario.username + ' admins permission');
+  }
+
+  const admin = await signIn('matrix-admin');
+  const subordinate = await admin.agent.post('/addAdmin')
+    .set('X-CSRF-Token', admin.csrfToken)
+    .send({ username: 'matrix-subordinate', password: 'A-strong-password-2026!', role: 'REGIONAL_ADMIN', region: 'Souss-Massa' });
+  assert.equal(subordinate.status, 201);
+
+  const forbiddenGlobal = await admin.agent.post('/addAdmin')
+    .set('X-CSRF-Token', admin.csrfToken)
+    .send({ username: 'matrix-global', password: 'A-strong-password-2026!', role: 'ADMIN' });
+  assert.equal(forbiddenGlobal.status, 403);
+});
+
 test('repeated login attempts are rate limited', async () => {
   await createAdmin('rate-limited-admin');
   for (let i = 0; i < 8; i += 1) {
