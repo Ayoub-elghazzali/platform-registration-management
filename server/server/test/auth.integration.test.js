@@ -212,6 +212,26 @@ test('administrative route families reject unauthenticated requests', async () =
   assert.ok(responses.every(response => response.status === 401));
 });
 
+
+test('authentication audit events contain no usernames or credential material', async () => {
+  await createAdmin('audit-admin');
+  const { response } = await signIn('audit-admin');
+  assert.equal(response.status, 200);
+  const event = await models.AuditEvent.findOne({ event: 'auth.login.succeeded' }).sort({ createdAt: -1 });
+  assert.ok(event);
+  assert.equal(event.actorId.toString().length, 24);
+  const serialized = JSON.stringify(event);
+  assert.equal(serialized.includes('audit-admin'), false);
+  assert.equal(serialized.includes('Correct-Horse-2026!'), false);
+});
+
+test('security audit endpoint requires the settings permission', async () => {
+  await createAdmin('audit-reader', 'USER');
+  const { agent } = await signIn('audit-reader');
+  const response = await agent.get('/security/audit');
+  assert.equal(response.status, 403);
+});
+
 test('repeated login attempts are rate limited', async () => {
   await createAdmin('rate-limited-admin');
   for (let i = 0; i < 8; i += 1) {
