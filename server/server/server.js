@@ -296,6 +296,23 @@ app.post('/auth/change-password', requireSameOrigin, requireCsrf, async (req, re
 app.use('/auth', (req, res) => res.status(404).json({ error: 'Route d’authentification introuvable.' }));
 
 // All administrative and private API routes below require an authenticated session and CSRF validation for writes.
+app.post('/createUser', requireSameOrigin, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    if (!rejectMongoOperators(body)) return res.status(400).json({ error: 'Données invalides.' });
+    const allowed = ['nom', 'prenom', 'age', 'cin', 'profession', 'region', 'province', 'commune', 'adresse', 'telephone', 'email'];
+    const input = Object.fromEntries(allowed.filter(key => body[key] !== undefined).map(key => [key, body[key]]));
+    if (!validText(input.nom, 1, 100) || !validText(input.prenom, 1, 100)) {
+      return res.status(400).json({ error: 'Nom et prénom obligatoires.' });
+    }
+    if (input.email && (typeof input.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email))) {
+      return res.status(400).json({ error: 'Adresse e-mail invalide.' });
+    }
+    const user = await User.create(input);
+    return res.status(201).json({ success: true, id: user._id, message: 'Inscription enregistrée.' });
+  } catch (error) { return next(error); }
+});
+
 app.use(authenticate);
 app.use(requireCsrf);
 
@@ -325,23 +342,6 @@ app.get('/users/:id/status', requirePermission('users:read'), async (req, res, n
     const scope = scopedQuery(req, { region: user.region, province: user.province });
     if (!scope) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
     return res.json({ status: user.status, validatedByDirectorRegional: user.validatedByDirectorRegional });
-  } catch (error) { return next(error); }
-});
-
-app.post('/createUser', requireSameOrigin, async (req, res, next) => {
-  try {
-    const body = req.body || {};
-    if (!rejectMongoOperators(body)) return res.status(400).json({ error: 'Données invalides.' });
-    const allowed = ['nom', 'prenom', 'age', 'cin', 'profession', 'region', 'province', 'commune', 'adresse', 'telephone', 'email'];
-    const input = Object.fromEntries(allowed.filter(key => body[key] !== undefined).map(key => [key, body[key]]));
-    if (!validText(input.nom, 1, 100) || !validText(input.prenom, 1, 100)) {
-      return res.status(400).json({ error: 'Nom et prénom obligatoires.' });
-    }
-    if (input.email && (typeof input.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email))) {
-      return res.status(400).json({ error: 'Adresse e-mail invalide.' });
-    }
-    const user = await User.create(input);
-    return res.status(201).json({ success: true, id: user._id, message: 'Inscription enregistrée.' });
   } catch (error) { return next(error); }
 });
 
