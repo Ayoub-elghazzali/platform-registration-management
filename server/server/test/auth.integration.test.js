@@ -122,6 +122,17 @@ test('verified legacy plaintext password is upgraded and removed', async () => {
   assert.ok(migrated.passwordHash);
 });
 
+
+test('weak legacy password requires operator reset and is not migrated', async () => {
+  await models.Admin.create({ username: 'weak-legacy-admin', password: 'weakpass', role: 'ADMIN', isActive: true });
+  const response = await request(app).post('/auth/login').send({ username: 'weak-legacy-admin', password: 'weakpass' });
+  assert.equal(response.status, 403);
+  assert.equal(response.body.error, 'PASSWORD_RESET_REQUIRED');
+  const unchanged = await models.Admin.findOne({ username: 'weak-legacy-admin' }).select('+password +passwordHash');
+  assert.equal(unchanged.password, 'weakpass');
+  assert.equal(unchanged.passwordHash, undefined);
+});
+
 test('legacy password is not migrated when the supplied value is incorrect', async () => {
   await models.Admin.create({
     username: 'legacy-wrong', password: 'Legacy-Password-2026', role: 'ADMIN', isActive: true
