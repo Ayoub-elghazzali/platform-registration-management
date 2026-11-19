@@ -32,6 +32,13 @@ if (isProduction && !process.env.COOKIE_SECURE) {
 
 app.disable('x-powered-by');
 app.set('trust proxy', isProduction ? 1 : false);
+app.use((req, res, next) => {
+  const origin = req.get('origin');
+  if (origin && !allowedOrigins.includes(origin)) {
+    return res.status(403).json({ error: 'Origine non autorisée.' });
+  }
+  return next();
+});
 app.use(helmet());
 app.use(cors({
   origin(origin, callback) {
