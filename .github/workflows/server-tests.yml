@@ -11,7 +11,7 @@ on:
       - ".github/workflows/server-tests.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test:
@@ -53,3 +53,14 @@ jobs:
             server/server/npm-audit.json
             server/server/package-lock.json
           if-no-files-found: ignore
+      - name: Commit regenerated backend lockfile after successful validation
+        if: success()
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          if ! git diff --quiet -- server/server/package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add server/server/package-lock.json
+            git commit -m "chore(deps): refresh backend lockfile"
+            git push
+          fi
