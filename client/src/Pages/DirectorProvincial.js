@@ -1,21 +1,20 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import axios from "../security/api";
+import { useAuth } from "../security/AuthContext";
 import styles from "./DirectorProvincial.module.css";
 
 
 function DirectorProvincial() {
   const [users, setUsers] = useState([]);
 
-  // نجبدو province من localStorage ونديرو trim
-  const province = localStorage.getItem("province")?.trim();
+  const { user } = useAuth();
+  const province = user?.province?.trim();
 
   useEffect(() => {
     if (province) {
-      console.log("Fetching users for province:", `"${province}"`);
       axios
-        .get(`http://localhost:3001/users/${encodeURIComponent(province)}`)
+        .get(`/users/${encodeURIComponent(province)}`)
         .then((res) => {
-          console.log("Users received:", res.data);
           setUsers(res.data);
         })
         .catch((err) => console.error(err));
@@ -24,7 +23,7 @@ function DirectorProvincial() {
 
   const handleStatus = (id, newStatus) => {
     axios
-      .post(`http://localhost:3001/users/${id}/status`, { status: newStatus })
+      .post(`/users/${id}/status`, { status: newStatus })
       .then(() => {
         setUsers((prev) =>
           prev.map((user) =>
