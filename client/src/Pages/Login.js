@@ -57,7 +57,7 @@ export default function Login() {
         {error && <p className="error-message" role="alert">{error}</p>}
         <label htmlFor="username">Nom d’utilisateur</label>
         <input id="username" name="username" type="text" autoComplete="username" value={username}
-          onChange={event => setUsername(event.target.value)} required minLength={3} maxLength={80} />
+          onChange={event => setUsername(event.target.value)} required minLength={2} maxLength={80} />
         <label htmlFor="password">Mot de passe</label>
         <input id="password" name="password" type="password" autoComplete="current-password" value={password}
           onChange={event => setPassword(event.target.value)} required maxLength={72} />
