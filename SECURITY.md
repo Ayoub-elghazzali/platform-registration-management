@@ -29,11 +29,11 @@ The API supports controlled on-login migration from the former plaintext `Admin.
 
 Provision the first super administrator from the backend using `npm run admin:create` with `ADMIN_USERNAME` and `ADMIN_PASSWORD` supplied only in the process environment. The script refuses to create a second active super administrator.
 
-For an account recovery, use `npm run admin:reset` with `RESET_ADMIN_USERNAME` and `RESET_ADMIN_PASSWORD` in the process environment. This resets the password hash and revokes all sessions for that account.
+For legacy regional/provincial accounts with missing scope, assign the verified region/province using `npm run admin:scope` and the `SCOPE_ADMIN_USERNAME`, `SCOPE_ADMIN_REGION`, or `SCOPE_ADMIN_PROVINCE` environment variables. Such accounts are denied access until scope is present.\n\nFor an account recovery, use `npm run admin:reset` with `RESET_ADMIN_USERNAME` and `RESET_ADMIN_PASSWORD` in the process environment. This resets the password hash and revokes all sessions for that account.
 
 ## Known limitations
 
-- The login attempt limiter currently uses in-process memory; use a shared store for multi-instance deployments.
+- The login attempt limiter currently uses in-process memory (8 attempts per account and 30 per IP per 15-minute window); use a shared store for multi-instance deployments.
 - Email-based password recovery, MFA, account lockout notifications, centralized audit event storage, and formal security monitoring are not implemented.
 - The current integration suite uses an isolated in-memory MongoDB test database; it does not validate production configuration or deployment infrastructure.
 - Historical credentials may remain in older Git commits. Treat any previously public secret as compromised and rotate it. History rewriting is not performed automatically.
