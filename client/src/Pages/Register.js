@@ -1,12 +1,10 @@
 
-// import React, { useState, useEffect } from "react";
+// import React, { useState } from "react";
 // import "./Register.css";
 // import Axios from "axios";
 
 // const Register = () => {
-//   const [users, setUsers] = useState([]);
-
-//   const [nom, setNom] = useState("");
+// //   const [nom, setNom] = useState("");
 //   const [prenom, setPrenom] = useState("");
 //   const [age, setAge] = useState("");
 //   const [cin, setCIN] = useState("");
@@ -33,7 +31,7 @@
 
 //   const createUser = (e) => {
 //     e.preventDefault();
-//     Axios.post("http://localhost:3001/createUser", {
+//     Axios.post("/createUser", {
 //       nom,
 //       prenom,
 //       age,
@@ -296,15 +294,6 @@ const Register = () => {
 
   const [showForm, setShowForm] = useState(false);
 
-  useEffect(() => {
-    Axios.get("http://localhost:3001/users")
-      .then((res) => {
-        setUsers(res.data);
-      })
-      .catch((err) => {
-        console.error("Erreur lors de la récupération des utilisateurs :", err);
-      });
-  }, []);
 
   const createUser = (e) => {
     e.preventDefault();
