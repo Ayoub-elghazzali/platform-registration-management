@@ -6,12 +6,12 @@ Administrative registration management platform with role-based dashboards and g
 
 ## Technology stack
 
-- **Frontend:** React 19, React Router, Axios, Recharts
+- **Frontend:** React 19, Vite 7, Vitest, React Router 7, Axios, Recharts
 - **Backend:** Node.js, Express 5, Mongoose
 - **Database:** MongoDB
 - **Authentication:** bcrypt password hashes, opaque server-side sessions, HttpOnly cookies, CSRF synchronizer tokens
 - **Security:** Helmet, restricted CORS, MongoDB operator-input rejection, request-size limits, server-side RBAC, geographic scoping and privacy-minimized audit events
-- **Tests:** Node.js test runner, Supertest, MongoDB Memory Server
+- **Tests:** Node.js test runner, Supertest, MongoDB Memory Server, Vitest and Testing Library
 
 ## Repository structure
 
@@ -52,6 +52,7 @@ npm run dev
 Run tests:
 
 ```bash
+npm run build
 npm run test:unit
 npm run test:integration
 npm test
@@ -64,10 +65,12 @@ The integration suite creates an isolated in-memory MongoDB instance. It does no
 ```bash
 cd client
 npm install
-npm start
+npm run dev
+npm test
+npm run build
 ```
 
-Set `REACT_APP_API_URL` when the API is not running at `http://localhost:3001`. The browser sends credentials using cookies; it does not persist authentication tokens in localStorage.
+Set `VITE_API_URL` when the API is not running at `http://localhost:3001`. The browser sends credentials using cookies; it does not persist authentication tokens in localStorage.
 
 ## Authentication architecture
 
@@ -117,9 +120,9 @@ GitHub Actions includes a backend unit/integration test workflow and a frontend 
 - Email-based password recovery, MFA, centralized SIEM forwarding, and alerting are not yet implemented.
 - The current role model reflects the legacy application's known roles. It requires owner review against the real administrative hierarchy before production use.
 - Existing legacy administrators must be migrated through successful login or reset using the documented operator procedure.
-- The frontend contains legacy screens and data displays that still require broader regression testing.
+- The frontend has moved from Create React App to Vite/Vitest; existing screen workflows still require manual pre-production acceptance testing.
 - Do not use actual identity documents or real personal records in demonstrations.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md). Report security issues privately to the repository owner. Never commit passwords, cookies, tokens, database URIs, or personal data.
+See [SECURITY.md](SECURITY.md) and the [Legacy Account Migration Runbook](server/server/docs/MIGRATION.md). Report security issues privately to the repository owner. Never commit passwords, cookies, tokens, database URIs, or personal data.
