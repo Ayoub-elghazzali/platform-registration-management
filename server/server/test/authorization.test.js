@@ -8,6 +8,8 @@ test('legacy administrator roles map to canonical roles', () => {
   assert.equal(normalizeRole('admin_general'), 'SUPER_ADMIN');
   assert.equal(normalizeRole('Director_Regional'), 'REGIONAL_ADMIN');
   assert.equal(normalizeRole('director_provincial'), 'PROVINCIAL_ADMIN');
+  assert.equal(normalizeRole('direction_regional'), 'REGIONAL_ADMIN');
+  assert.equal(normalizeRole('direction_provincial'), 'PROVINCIAL_ADMIN');
 });
 
 test('permissions are evaluated server-side by role', () => {
