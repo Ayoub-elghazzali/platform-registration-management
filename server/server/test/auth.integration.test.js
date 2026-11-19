@@ -203,6 +203,7 @@ test('administrative route families reject unauthenticated requests', async () =
     request(app).get('/acceptedUsers'),
     request(app).get('/finalAccepted'),
     request(app).get('/stats/provinces'),
+    request(app).get('/security/audit'),
     request(app).post('/addAdmin').send({}),
     request(app).post('/addField').send({}),
     request(app).post('/validateDecision/507f1f77bcf86cd799439011').send({}),
@@ -230,6 +231,24 @@ test('security audit endpoint requires the settings permission', async () => {
   const { agent } = await signIn('audit-reader');
   const response = await agent.get('/security/audit');
   assert.equal(response.status, 403);
+});
+
+
+test('super administrator can inspect audit events without receiving IP hashes', async () => {
+  const { agent } = await signIn('root-admin');
+  const response = await agent.get('/security/audit');
+  assert.equal(response.status, 200);
+  assert.ok(Array.isArray(response.body.data));
+  if (response.body.data[0]) {
+    assert.equal(Object.hasOwn(response.body.data[0], 'ipHash'), false);
+  }
+});
+
+test('administrator listings never expose password fields', async () => {
+  const { agent } = await signIn('root-admin');
+  const response = await agent.get('/admins');
+  assert.equal(response.status, 200);
+  assert.ok(response.body.every(admin => !Object.hasOwn(admin, 'password') && !Object.hasOwn(admin, 'passwordHash')));
 });
 
 test('repeated login attempts are rate limited', async () => {
