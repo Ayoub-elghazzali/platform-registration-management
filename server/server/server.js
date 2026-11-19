@@ -122,7 +122,8 @@ function publicAdmin(admin) {
     username: admin.username,
     role: normalizeRole(admin.role),
     region: admin.region || null,
-    province: admin.province || null
+    province: admin.province || null,
+    isActive: admin.isActive !== false
   };
 }
 function validText(value, min = 1, max = 120) {
@@ -275,6 +276,14 @@ app.post('/auth/logout', requireSameOrigin, requireCsrf, async (req, res, next) 
     await Session.deleteOne({ _id: req.sessionRecord._id });
     clearSessionCookie(res);
     return res.status(204).end();
+  } catch (error) { return next(error); }
+});
+app.post('/auth/refresh', requireSameOrigin, requireCsrf, async (req, res, next) => {
+  try {
+    await Session.deleteOne({ _id: req.sessionRecord._id });
+    const admin = { _id: req.admin.id };
+    const csrfToken = await createSession(admin, res);
+    return res.json({ success: true, csrfToken, expiresInSeconds: SESSION_TTL_MS / 1000 });
   } catch (error) { return next(error); }
 });
 app.post('/auth/change-password', requireSameOrigin, requireCsrf, async (req, res, next) => {
