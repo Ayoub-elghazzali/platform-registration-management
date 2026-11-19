@@ -37,7 +37,7 @@ Requirements: Node.js 20+, npm, and a local MongoDB instance or a dedicated test
 
 ```bash
 cd server/server
-npm install
+npm ci
 cp .env.example .env
 ```
 
@@ -64,7 +64,7 @@ The integration suite creates an isolated in-memory MongoDB instance. It does no
 
 ```bash
 cd client
-npm install
+npm ci
 npm run dev
 npm test
 npm run build
