@@ -47,7 +47,7 @@ const adminSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true, lowercase: true, maxlength: 80, index: true },
   passwordHash: { type: String, select: false },
   password: { type: String, select: false }, // Legacy plaintext field, removed after a verified successful login.
-  role: { type: String, required: true, enum: ['SUPER_ADMIN', 'ADMIN', 'REGIONAL_ADMIN', 'PROVINCIAL_ADMIN', 'USER', 'admin_general', 'president_regional', 'Director_Regional', 'president_provincial', 'director_provincial'] },
+  role: { type: String, required: true, enum: ['SUPER_ADMIN', 'ADMIN', 'REGIONAL_ADMIN', 'PROVINCIAL_ADMIN', 'USER', 'admin', 'admin_general', 'president_regional', 'Director_Regional', 'director_regional', 'direction_regional', 'president_provincial', 'director_provincial', 'direction_provincial', 'user'] },
   region: { type: String, trim: true, default: null },
   province: { type: String, trim: true, default: null },
   isActive: { type: Boolean, default: true, index: true },
