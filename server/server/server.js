@@ -89,8 +89,29 @@ const sessionSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema);
 
+const auditEventSchema = new mongoose.Schema({
+  event: { type: String, required: true, index: true },
+  actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null, index: true },
+  targetId: { type: String, default: null },
+  ipHash: { type: String, default: null },
+  createdAt: { type: Date, default: Date.now, index: true }
+}, { versionKey: false });
+const AuditEvent = mongoose.models.AuditEvent || mongoose.model('AuditEvent', auditEventSchema);
+
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
+}
+async function writeAudit(event, req, actorId = null, targetId = null) {
+  try {
+    await AuditEvent.create({
+      event,
+      actorId: actorId || null,
+      targetId: targetId ? String(targetId) : null,
+      ipHash: req.ip ? sha256(req.ip) : null
+    });
+  } catch (_) {
+    // Audit persistence failures must not leak request data or break authentication flows.
+  }
 }
 function randomToken(bytes = 32) {
   return crypto.randomBytes(bytes).toString('base64url');
@@ -251,10 +272,14 @@ async function loginHandler(req, res, next) {
     }
     const admin = await Admin.findOne({ username: username.trim().toLowerCase() }).select('+password +passwordHash');
     if (!admin || !admin.isActive) {
+      await writeAudit('auth.login.failed', req);
       return res.status(401).json({ error: 'Identifiants incorrects.' });
     }
     const verification = await verifyPassword(password, admin);
-    if (!verification.valid) return res.status(401).json({ error: 'Identifiants incorrects.' });
+    if (!verification.valid) {
+      await writeAudit('auth.login.failed', req, admin._id);
+      return res.status(401).json({ error: 'Identifiants incorrects.' });
+    }
 
     if (verification.needsMigration) {
       try {
@@ -263,9 +288,14 @@ async function loginHandler(req, res, next) {
           { _id: admin._id, password },
           { $set: { passwordHash, passwordChangedAt: new Date() }, $unset: { password: '' } }
         );
-        if (!migration.matchedCount) return res.status(401).json({ error: 'Identifiants incorrects.' });
+        if (!migration.matchedCount) {
+          await writeAudit('auth.password.migration_conflict', req, admin._id);
+          return res.status(401).json({ error: 'Identifiants incorrects.' });
+        }
+        await writeAudit('auth.password.legacy_migrated', req, admin._id);
       } catch (migrationError) {
         // A verified legacy password shorter than current policy is not upgraded automatically.
+        await writeAudit('auth.password.reset_required', req, admin._id);
         return res.status(403).json({ error: 'PASSWORD_RESET_REQUIRED', message: 'Votre ancien mot de passe ne respecte plus la politique de sécurité. Contactez un administrateur pour réinitialiser votre accès.' });
       }
     }
@@ -273,6 +303,7 @@ async function loginHandler(req, res, next) {
     await Session.deleteMany({ adminId: admin._id });
     const csrfToken = await createSession(admin, res);
     resetLoginAttempts(req);
+    await writeAudit('auth.login.succeeded', req, admin._id);
     return res.json({ success: true, user: publicAdmin(admin), csrfToken });
   } catch (error) {
     return next(error);
@@ -287,6 +318,7 @@ app.get('/auth/csrf', (req, res) => res.json({ csrfToken: req.sessionRecord.csrf
 app.post('/auth/logout', requireSameOrigin, requireCsrf, async (req, res, next) => {
   try {
     await Session.deleteOne({ _id: req.sessionRecord._id });
+    await writeAudit('auth.logout', req, req.admin.id);
     clearSessionCookie(res);
     return res.status(204).end();
   } catch (error) { return next(error); }
@@ -311,6 +343,7 @@ app.post('/auth/change-password', requireSameOrigin, requireCsrf, async (req, re
     const passwordHash = await hashPassword(newPassword);
     await Admin.updateOne({ _id: admin._id }, { $set: { passwordHash, passwordChangedAt: new Date() }, $unset: { password: '' } });
     await Session.deleteMany({ adminId: admin._id });
+    await writeAudit('auth.password.changed', req, admin._id);
     clearSessionCookie(res);
     return res.json({ success: true, message: 'Mot de passe modifié. Veuillez vous reconnecter.' });
   } catch (error) { return next(error); }
@@ -405,6 +438,7 @@ app.post('/addAdmin', requirePermission('admins:create'), async (req, res, next)
       region: normalizedRole === 'REGIONAL_ADMIN' ? region.trim() : null,
       isActive: true
     });
+    await writeAudit('admin.created', req, req.admin.id, admin._id);
     return res.status(201).json({ success: true, admin: publicAdmin(admin) });
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ error: 'Ce nom d’utilisateur existe déjà.' });
@@ -428,6 +462,7 @@ app.delete('/deleteAdmin/:username', requirePermission('admins:disable'), async 
     target.isActive = false;
     await target.save();
     await Session.deleteMany({ adminId: target._id });
+    await writeAudit('admin.disabled', req, req.admin.id, target._id);
     return res.json({ success: true, message: 'Administrateur désactivé.' });
   } catch (error) { return next(error); }
 });
@@ -486,6 +521,18 @@ app.get('/finalAccepted', requirePermission('registrations:read'), async (req, r
   } catch (error) { return next(error); }
 });
 
+app.get('/security/audit', requirePermission('settings:manage'), async (req, res, next) => {
+  try {
+    const page = Math.max(1, Math.min(1000, Number.parseInt(req.query.page, 10) || 1));
+    const limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 50));
+    const [events, total] = await Promise.all([
+      AuditEvent.find().select('event actorId targetId createdAt').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+      AuditEvent.countDocuments()
+    ]);
+    return res.json({ data: events, pagination: { page, limit, total } });
+  } catch (error) { return next(error); }
+});
+
 app.get('/stats/provinces', requirePermission('statistics:read'), async (req, res, next) => {
   try {
     const scope = scopedQuery(req, {});
@@ -533,4 +580,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, startServer, models: { Admin, User, Field, Session } };
+module.exports = { app, startServer, models: { Admin, User, Field, Session, AuditEvent } };
