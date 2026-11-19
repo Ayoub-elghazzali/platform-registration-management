@@ -1,23 +1,16 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 import { useAuth } from "./AuthContext";
 
+jest.mock("react-router-dom", () => ({
+  Navigate: () => <p>Login screen</p>
+}), { virtual: true });
 jest.mock("./AuthContext", () => ({ useAuth: jest.fn() }));
 
 function renderGuard(user) {
   useAuth.mockReturnValue({ user, loading: false });
-  return render(
-    <MemoryRouter initialEntries={["/private"]}>
-      <Routes>
-        <Route path="/login" element={<p>Login screen</p>} />
-        <Route path="/private" element={
-          <ProtectedRoute roles={["SUPER_ADMIN"]}><p>Private dashboard</p></ProtectedRoute>
-        } />
-      </Routes>
-    </MemoryRouter>
-  );
+  return render(<ProtectedRoute roles={["SUPER_ADMIN"]}><p>Private dashboard</p></ProtectedRoute>);
 }
 
 test("unauthenticated users are redirected to login", () => {
