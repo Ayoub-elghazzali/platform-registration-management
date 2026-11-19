@@ -41,3 +41,7 @@ For legacy regional/provincial accounts with missing scope, assign the verified 
 ## Reporting
 
 Do not publish credentials, personal data, database exports, session material, or exploit details in public issues. Contact the repository owner privately.
+
+## Audit event privacy
+
+Authentication successes and failures, password migrations/changes, administrator creation/disablement, and logout events are stored as structured audit events. They contain event type, actor/target identifiers where available, timestamp, and a one-way hash of the client IP. They do not contain usernames, passwords, cookies, session identifiers, CSRF tokens, request bodies, or registration records. The `GET /security/audit` endpoint requires `settings:manage` and omits the IP hash from its response.
