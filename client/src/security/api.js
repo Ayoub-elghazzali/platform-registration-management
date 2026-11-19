@@ -18,3 +18,15 @@ axios.interceptors.request.use((config) => {
 });
 
 export default axios;
+
+axios.interceptors.response.use(
+  response => response,
+  error => {
+    const status = error.response?.status;
+    const url = error.config?.url || "";
+    if (status === 401 && !url.includes("/auth/login") && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("auth:expired"));
+    }
+    return Promise.reject(error);
+  }
+);
