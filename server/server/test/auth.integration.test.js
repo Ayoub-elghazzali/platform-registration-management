@@ -183,6 +183,36 @@ test('password change requires current password and revokes existing session', a
   assert.equal(relogin.status, 200);
 });
 
+
+test('disabling an administrator revokes all of that account sessions', async () => {
+  await createAdmin('session-target', 'PROVINCIAL_ADMIN', { province: 'Marrakech' });
+  await createAdmin('session-supervisor');
+  const target = await signIn('session-target');
+  assert.equal(target.response.status, 200);
+  const supervisor = await signIn('root-admin');
+  const csrf = supervisor.csrfToken;
+  const disabled = await supervisor.agent.delete('/deleteAdmin/session-target').set('X-CSRF-Token', csrf);
+  assert.equal(disabled.status, 200);
+  const targetMe = await target.agent.get('/auth/me');
+  assert.equal(targetMe.status, 401);
+});
+
+test('administrative route families reject unauthenticated requests', async () => {
+  const checks = [
+    request(app).get('/users'),
+    request(app).get('/admins'),
+    request(app).get('/acceptedUsers'),
+    request(app).get('/finalAccepted'),
+    request(app).get('/stats/provinces'),
+    request(app).post('/addAdmin').send({}),
+    request(app).post('/addField').send({}),
+    request(app).post('/validateDecision/507f1f77bcf86cd799439011').send({}),
+    request(app).delete('/deleteAdmin/some-admin')
+  ];
+  const responses = await Promise.all(checks);
+  assert.ok(responses.every(response => response.status === 401));
+});
+
 test('repeated login attempts are rate limited', async () => {
   await createAdmin('rate-limited-admin');
   for (let i = 0; i < 8; i += 1) {
