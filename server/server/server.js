@@ -472,7 +472,8 @@ app.delete('/deleteAdmin/:username', requirePermission('admins:disable'), async 
     const target = await Admin.findOne({ username: req.params.username.toLowerCase() });
     if (!target) return res.status(404).json({ error: 'Administrateur introuvable.' });
     if (String(target._id) === req.admin.id) return res.status(400).json({ error: 'Vous ne pouvez pas désactiver votre propre compte.' });
-    if (['SUPER_ADMIN', 'ADMIN'].includes(normalizeRole(target.role)) && req.admin.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Seul le super administrateur peut désactiver un compte administrateur global.' });
+    if (normalizeRole(target.role) === 'SUPER_ADMIN') return res.status(403).json({ error: 'Un compte super administrateur ne peut pas être désactivé depuis cette API.' });
+    if (normalizeRole(target.role) === 'ADMIN' && req.admin.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Seul le super administrateur peut désactiver un administrateur global.' });
     target.isActive = false;
     await target.save();
     await Session.deleteMany({ adminId: target._id });
