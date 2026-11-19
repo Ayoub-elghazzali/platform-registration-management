@@ -4,7 +4,7 @@
 
 The API uses opaque, cryptographically random server-side sessions, not browser-stored JWTs. Only a SHA-256 digest of the session identifier is stored in MongoDB. The raw identifier is delivered in an HttpOnly, SameSite=Lax cookie named `prm_session`; the cookie is Secure in production. Sessions expire after eight hours. Logout, password changes, account disablement, and login session rotation revoke existing sessions.
 
-Unsafe authenticated requests require the session's synchronizer CSRF token in `X-CSRF-Token`. The token is returned by login and `GET /auth/csrf`; it is held in frontend memory, not localStorage. Login and other state-changing browser operations also validate the Origin when it is present. CORS allows only configured `CLIENT_ORIGINS`.
+Unsafe authenticated requests require the session's synchronizer CSRF token in `X-CSRF-Token`. The token is returned by login and `GET /auth/csrf`; it is held in frontend memory, not localStorage. Login, logout, session renewal, and password-change endpoints validate the Origin when it is present. Other authenticated mutations require the synchronizer CSRF token. CORS allows only configured `CLIENT_ORIGINS`.
 
 ## Authentication endpoints
 
@@ -33,7 +33,7 @@ The legacy `POST /loginAdmin` path is retained as a compatibility alias and uses
 | GET | `/security/audit` | `settings:manage` |
 | GET | `/admins` | `admins:read` |
 | POST | `/addAdmin` | `admins:create` |
-| DELETE | `/deleteAdmin/:username` | `admins:disable` |
+| DELETE | `/deleteAdmin/:username` | `admins:disable` (soft disable; sessions revoked) |
 | POST | `/addField` | `provinces:manage` |
 | POST | `/createUser` | Public pending registration; whitelisted fields only |
 
