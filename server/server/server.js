@@ -7,30 +7,22 @@ const mongoose = require("mongoose");
 app.use(cors());
 app.use(express.json());
 
-const DEFAULT_MONGO_URI =
-  "mongodb+srv://fatima:d3TCUhfPngRDfryY@cluster0.iksgczs.mongodb.net/application";
-const FALLBACK_LOCAL_URI =
-  process.env.MONGODB_FALLBACK_URI || "mongodb://127.0.0.1:27017/application";
-
-const mongoUris = [process.env.MONGODB_URI || DEFAULT_MONGO_URI];
-if (!mongoUris.includes(FALLBACK_LOCAL_URI)) {
-  mongoUris.push(FALLBACK_LOCAL_URI);
-}
-
 async function connectToDatabase() {
-  let lastError = null;
-  for (const uri of mongoUris) {
-    try {
-      await mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 });
-      console.log(`✅ Connecté à MongoDB (${uri})`);
-      return;
-    } catch (error) {
-      lastError = error;
-      console.error(`❌ Échec de connexion à ${uri}:`, error.message);
-    }
+  const mongoUri = process.env.MONGODB_URI;
+
+  if (!mongoUri) {
+    throw new Error(
+      "Missing MONGODB_URI. Configure it in the server environment before startup."
+    );
   }
 
-  throw lastError;
+  try {
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
+    console.log("Connected to MongoDB.");
+  } catch (error) {
+    console.error("MongoDB connection failed:", error.message);
+    throw error;
+  }
 }
 
 const userSchema = new mongoose.Schema({
