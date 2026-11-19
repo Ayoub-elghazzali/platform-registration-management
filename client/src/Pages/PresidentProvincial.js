@@ -1,18 +1,20 @@
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import axios from "../security/api";
+import { useAuth } from "../security/AuthContext";
 import ProvinceStats from "./ProvinceStats";
 import "./PresidentProvincial.module.css";
 
 
 function PresidentProvincial() {
   const [users, setUsers] = useState([]);
-  const province = localStorage.getItem("province")?.trim(); // نزيد trim باش نحيد الفراغات
+  const { user } = useAuth();
+  const province = user?.province?.trim();
 
   useEffect(() => {
     if (province) {
       axios
-        .get(`http://localhost:3001/users/${province}`)
+        .get(`/users/${encodeURIComponent(province)}`)
         .then((res) => setUsers(res.data))
         .catch((err) => console.error(err));
     }
