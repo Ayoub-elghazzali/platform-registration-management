@@ -186,7 +186,6 @@ test('password change requires current password and revokes existing session', a
 
 test('disabling an administrator revokes all of that account sessions', async () => {
   await createAdmin('session-target', 'PROVINCIAL_ADMIN', { province: 'Marrakech' });
-  await createAdmin('session-supervisor');
   const target = await signIn('session-target');
   assert.equal(target.response.status, 200);
   const supervisor = await signIn('root-admin');
