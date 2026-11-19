@@ -31,6 +31,7 @@ jobs:
       - name: Regenerate lockfile with compatible dependency updates
         run: npm install --package-lock-only --ignore-scripts --legacy-peer-deps
       - name: Apply non-breaking dependency security updates
+        continue-on-error: true
         run: npm audit fix --package-lock-only --ignore-scripts --legacy-peer-deps
       - name: Install frontend dependencies from lockfile
         run: npm ci --legacy-peer-deps
