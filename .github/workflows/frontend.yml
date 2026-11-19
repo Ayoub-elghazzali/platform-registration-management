@@ -1,4 +1,4 @@
-name: Frontend tests, build and audit
+name: Frontend tests, build, audit and docs verification
 
 on:
   push:
