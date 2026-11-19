@@ -57,10 +57,11 @@ function DashboardGeneral() {
 
   async function handleAddField(event) {
     event.preventDefault();
+    const form = event.currentTarget;
     try {
-      await axios.post("/addField", { type: event.currentTarget.type.value, name: event.currentTarget.fieldName.value });
+      await axios.post("/addField", { type: form.elements.type.value, name: form.elements.fieldName.value });
       setError("Champ ajouté.");
-      event.currentTarget.reset();
+      form.reset();
     } catch (requestError) {
       setError(requestError.response?.data?.error || "Ajout impossible.");
     }
