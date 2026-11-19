@@ -7,14 +7,14 @@ const DirectorRegional = () => {
 
   useEffect(() => {
     axios
-      .get("http://localhost:3001/acceptedUsers")
+      .get("acceptedUsers")
       .then((res) => setUsers(res.data))
       .catch((err) => console.error("Erreur:", err));
   }, []);
 
   const handleValidate = async (userId) => {
     try {
-      await axios.post(`http://localhost:3001/validateDecision/${userId}`);
+      await axios.post(`validateDecision/${userId}`);
       setUsers((prev) =>
         prev.map((u) =>
           u._id === userId ? { ...u, validatedByDirectorRegional: true } : u
