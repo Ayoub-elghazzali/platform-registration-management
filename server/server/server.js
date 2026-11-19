@@ -174,7 +174,7 @@ async function authenticate(req, res, next) {
   try {
     const rawToken = cookieValue(req, SESSION_COOKIE);
     if (!rawToken || rawToken.length > 200) return res.status(401).json({ error: 'Authentification requise.' });
-    const session = await Session.findOne({ tokenHash: sha256(rawToken), expiresAt: { $gt: new Date() } });
+    const session = await Session.findOne({ tokenHash: sha256(rawToken), expiresAt: mongoose.trusted({ $gt: new Date() }) });
     if (!session) {
       clearSessionCookie(res);
       return res.status(401).json({ error: 'Session expirée ou invalide.' });
@@ -330,7 +330,10 @@ app.get('/users', requirePermission('users:read'), async (req, res, next) => {
       User.find(scope).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
       User.countDocuments(scope)
     ]);
-    return res.json({ data: users, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+    res.set('X-Total-Count', String(total));
+    res.set('X-Page', String(page));
+    res.set('X-Limit', String(limit));
+    return res.json(users);
   } catch (error) { return next(error); }
 });
 
@@ -461,7 +464,7 @@ app.get('/stats/provinces', requirePermission('statistics:read'), async (req, re
   try {
     const scope = scopedQuery(req, {});
     if (!scope) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
-    const stats = await User.aggregate([
+    const rows = await User.aggregate([
       { $match: scope },
       { $group: {
         _id: { $ifNull: ['$province', 'Inconnue'] },
@@ -472,6 +475,9 @@ app.get('/stats/provinces', requirePermission('statistics:read'), async (req, re
       }},
       { $sort: { _id: 1 } }
     ]);
+    const stats = Object.fromEntries(rows.map(row => [row._id, {
+      total: row.total, accepted: row.accepted, refused: row.refused, pending: row.pending
+    }]));
     return res.json(stats);
   } catch (error) { return next(error); }
 });
