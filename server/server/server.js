@@ -1,341 +1,504 @@
-require("dotenv").config();
-const express = require("express");
+'use strict';
+
+require('dotenv').config();
+
+const crypto = require('node:crypto');
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const helmet = require('helmet');
+const { getMongoUri } = require('./config/database');
+const { hashPassword, verifyPassword } = require('./security/passwords');
+const { normalizeRole, hasPermission, geographicFilter } = require('./security/authorization');
+
 const app = express();
-const cors = require("cors");
-const mongoose = require("mongoose");
-const { getMongoUri } = require("./config/database");
+const PORT = Number(process.env.PORT || 3001);
+const SESSION_COOKIE = 'prm_session';
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const isProduction = process.env.NODE_ENV === 'production';
+const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:3000')
+  .split(',').map(value => value.trim()).filter(Boolean);
 
-app.use(cors());
-app.use(express.json());
+if (isProduction && !process.env.CLIENT_ORIGINS) {
+  throw new Error('CLIENT_ORIGINS must be configured in production.');
+}
+if (isProduction && !process.env.COOKIE_SECURE) {
+  // Secure cookies are mandatory in production; this guard prevents accidental HTTP deployment.
+  process.env.COOKIE_SECURE = 'true';
+}
 
-async function connectToDatabase() {
-  const mongoUri = getMongoUri();
+app.disable('x-powered-by');
+app.set('trust proxy', isProduction ? 1 : false);
+app.use(helmet());
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Origin not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-CSRF-Token']
+}));
+app.use(express.json({ limit: '200kb', strict: true }));
 
-  if (!mongoUri) {
-    throw new Error(
-      "Missing MONGODB_URI. Configure it in the server environment before startup."
+mongoose.set('sanitizeFilter', true);
+
+const adminSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true, trim: true, lowercase: true, maxlength: 80, index: true },
+  passwordHash: { type: String, select: false },
+  password: { type: String, select: false }, // Legacy plaintext field, removed after a verified successful login.
+  role: { type: String, required: true, enum: ['SUPER_ADMIN', 'ADMIN', 'REGIONAL_ADMIN', 'PROVINCIAL_ADMIN', 'USER', 'admin_general', 'president_regional', 'Director_Regional', 'president_provincial', 'director_provincial'] },
+  region: { type: String, trim: true, default: null },
+  province: { type: String, trim: true, default: null },
+  isActive: { type: Boolean, default: true, index: true },
+  passwordChangedAt: { type: Date, default: null },
+  createdAt: { type: Date, default: Date.now }
+}, { timestamps: true, strict: true });
+const Admin = mongoose.models.Admin || mongoose.model('Admin', adminSchema);
+
+const userSchema = new mongoose.Schema({
+  nom: { type: String, trim: true, maxlength: 100 },
+  prenom: { type: String, trim: true, maxlength: 100 },
+  age: { type: Number, min: 0, max: 120 },
+  cin: { type: String, trim: true, maxlength: 40 },
+  profession: { type: String, trim: true, maxlength: 120 },
+  region: { type: String, trim: true, maxlength: 120 },
+  province: { type: String, trim: true, maxlength: 120, index: true },
+  commune: { type: String, trim: true, maxlength: 120 },
+  adresse: { type: String, trim: true, maxlength: 300 },
+  telephone: { type: String, trim: true, maxlength: 40 },
+  email: { type: String, trim: true, lowercase: true, maxlength: 254 },
+  status: { type: String, enum: ['en attente', 'accepté', 'refusé'], default: 'en attente', index: true },
+  validatedByDirectorRegional: { type: Boolean, default: false }
+}, { timestamps: true, strict: true });
+userSchema.index({ region: 1, province: 1, status: 1 });
+const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+const fieldSchema = new mongoose.Schema({
+  type: { type: String, enum: ['province', 'commune'], required: true },
+  name: { type: String, required: true, trim: true, maxlength: 120 }
+}, { timestamps: true });
+fieldSchema.index({ type: 1, name: 1 }, { unique: true });
+const Field = mongoose.models.Field || mongoose.model('Field', fieldSchema);
+
+const sessionSchema = new mongoose.Schema({
+  tokenHash: { type: String, required: true, unique: true },
+  adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true, index: true },
+  csrfToken: { type: String, required: true },
+  expiresAt: { type: Date, required: true, expires: 0 }
+}, { timestamps: true });
+const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema);
+
+function sha256(value) {
+  return crypto.createHash('sha256').update(value).digest('hex');
+}
+function randomToken(bytes = 32) {
+  return crypto.randomBytes(bytes).toString('base64url');
+}
+function cookieValue(req, name) {
+  const header = req.headers.cookie || '';
+  for (const part of header.split(';')) {
+    const index = part.indexOf('=');
+    if (index < 0) continue;
+    if (part.slice(0, index).trim() === name) return decodeURIComponent(part.slice(index + 1).trim());
+  }
+  return null;
+}
+function cookieOptions() {
+  return {
+    httpOnly: true,
+    secure: isProduction || process.env.COOKIE_SECURE === 'true',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: SESSION_TTL_MS
+  };
+}
+function clearSessionCookie(res) {
+  res.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: isProduction || process.env.COOKIE_SECURE === 'true', sameSite: 'lax', path: '/' });
+}
+function publicAdmin(admin) {
+  return {
+    id: String(admin._id),
+    username: admin.username,
+    role: normalizeRole(admin.role),
+    region: admin.region || null,
+    province: admin.province || null
+  };
+}
+function validText(value, min = 1, max = 120) {
+  return typeof value === 'string' && value.trim().length >= min && value.trim().length <= max;
+}
+function rejectMongoOperators(value, depth = 0) {
+  if (depth > 12) return false;
+  if (Array.isArray(value)) return value.every(item => rejectMongoOperators(item, depth + 1));
+  if (value && typeof value === 'object') {
+    return Object.entries(value).every(([key, child]) =>
+      !key.startsWith('$') && !key.includes('.') && rejectMongoOperators(child, depth + 1)
     );
   }
+  return true;
+}
 
+const loginAttempts = new Map();
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 8;
+function loginRateLimit(req, res, next) {
+  const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+  const key = sha256(`${req.ip}:${username}`);
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (entry && entry.resetAt > now && entry.count >= LOGIN_MAX_ATTEMPTS) {
+    return res.status(429).json({ error: 'Trop de tentatives. Réessayez dans quelques minutes.' });
+  }
+  if (!entry || entry.resetAt <= now) loginAttempts.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+  else entry.count += 1;
+  if (loginAttempts.size > 5000) {
+    for (const [k, v] of loginAttempts) if (v.resetAt <= now) loginAttempts.delete(k);
+  }
+  return next();
+}
+function resetLoginAttempts(req) {
+  const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+  loginAttempts.delete(sha256(`${req.ip}:${username}`));
+}
+
+function requireSameOrigin(req, res, next) {
+  const origin = req.get('origin');
+  if (origin && !allowedOrigins.includes(origin)) {
+    return res.status(403).json({ error: 'Origine non autorisée.' });
+  }
+  return next();
+}
+
+async function authenticate(req, res, next) {
   try {
-    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
-    console.log("Connected to MongoDB.");
+    const rawToken = cookieValue(req, SESSION_COOKIE);
+    if (!rawToken || rawToken.length > 200) return res.status(401).json({ error: 'Authentification requise.' });
+    const session = await Session.findOne({ tokenHash: sha256(rawToken), expiresAt: { $gt: new Date() } });
+    if (!session) {
+      clearSessionCookie(res);
+      return res.status(401).json({ error: 'Session expirée ou invalide.' });
+    }
+    const admin = await Admin.findById(session.adminId).select('_id username role region province isActive');
+    if (!admin || !admin.isActive) {
+      await Session.deleteOne({ _id: session._id });
+      clearSessionCookie(res);
+      return res.status(401).json({ error: 'Compte désactivé ou introuvable.' });
+    }
+    req.admin = publicAdmin(admin);
+    req.sessionRecord = session;
+    return next();
   } catch (error) {
-    console.error("MongoDB connection failed:", error.message);
-    throw error;
+    return next(error);
   }
 }
 
-const userSchema = new mongoose.Schema({
-  nom: String,
-  prenom: String,
-  age: Number,
-  cin: String,
-  profession: String,
-  region: String,
-  province: String,
-  commune: String,
-  adresse: String,
-  telephone: String,
-  email: String,
-  status: { type: String, default: "en attente" },
-  validatedByDirectorRegional: { type: Boolean, default: false },
-});
+function requirePermission(permission) {
+  return (req, res, next) => {
+    if (!req.admin || !hasPermission(req.admin.role, permission)) {
+      return res.status(403).json({ error: 'Permission insuffisante.' });
+    }
+    return next();
+  };
+}
 
-const User = mongoose.model("User", userSchema);
+function requireCsrf(req, res, next) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  const supplied = req.get('x-csrf-token');
+  if (!supplied || !req.sessionRecord || supplied !== req.sessionRecord.csrfToken) {
+    return res.status(403).json({ error: 'Jeton CSRF absent ou invalide.' });
+  }
+  return next();
+}
 
-const adminSchema = new mongoose.Schema({
-  username: String,
-  password: String,
-  role: String,
-  province: String, // الولاية أو المقاطعة التي ينتمي إليها
-});
-const Admin = mongoose.model("Admin", adminSchema);
+function scopedQuery(req, requested = {}) {
+  return geographicFilter(req.admin, requested);
+}
 
-// Routes
-app.get("/users", async (req, res) => {
+async function createSession(admin, res) {
+  const rawToken = randomToken();
+  const csrfToken = randomToken(24);
+  await Session.create({
+    tokenHash: sha256(rawToken),
+    adminId: admin._id,
+    csrfToken,
+    expiresAt: new Date(Date.now() + SESSION_TTL_MS)
+  });
+  res.cookie(SESSION_COOKIE, rawToken, cookieOptions());
+  return csrfToken;
+}
+
+app.get('/', (req, res) => res.json({ status: 'ok', service: 'Platform Registration Management API' }));
+
+async function loginHandler(req, res, next) {
   try {
-    const users = await User.find({});
-    console.log("Nombre total d'utilisateurs:", users.length); // هنا
-    res.json(users);
+    const { username, password } = req.body || {};
+    if (!validText(username, 2, 80) || typeof password !== 'string' || password.length < 1 || password.length > 128) {
+      return res.status(400).json({ error: 'Identifiants invalides.' });
+    }
+    const admin = await Admin.findOne({ username: username.trim().toLowerCase() }).select('+password +passwordHash');
+    if (!admin || !admin.isActive) {
+      return res.status(401).json({ error: 'Identifiants incorrects.' });
+    }
+    const verification = await verifyPassword(password, admin);
+    if (!verification.valid) return res.status(401).json({ error: 'Identifiants incorrects.' });
+
+    if (verification.needsMigration) {
+      try {
+        const passwordHash = await hashPassword(password);
+        await Admin.updateOne(
+          { _id: admin._id, password },
+          { $set: { passwordHash, passwordChangedAt: new Date() }, $unset: { password: '' } }
+        );
+      } catch (migrationError) {
+        // A verified legacy password shorter than current policy is not upgraded automatically.
+        return res.status(403).json({ error: 'PASSWORD_RESET_REQUIRED', message: 'Votre ancien mot de passe ne respecte plus la politique de sécurité. Contactez un administrateur pour réinitialiser votre accès.' });
+      }
+    }
+
+    await Session.deleteMany({ adminId: admin._id });
+    const csrfToken = await createSession(admin, res);
+    resetLoginAttempts(req);
+    return res.json({ success: true, user: publicAdmin(admin), csrfToken });
   } catch (error) {
-    console.error("Erreur dans /users:", error);
-    res.status(500).send("Erreur serveur");
+    return next(error);
   }
-});
+}
+app.post('/auth/login', requireSameOrigin, loginRateLimit, loginHandler);
+app.post('/loginAdmin', requireSameOrigin, loginRateLimit, loginHandler);
 
-// إنشاء مستخدم جديد
-app.post("/createUser", async (req, res) => {
+app.use('/auth', authenticate);
+app.get('/auth/me', (req, res) => res.json({ user: req.admin }));
+app.get('/auth/csrf', (req, res) => res.json({ csrfToken: req.sessionRecord.csrfToken }));
+app.post('/auth/logout', requireSameOrigin, requireCsrf, async (req, res, next) => {
   try {
-    const newUser = new User(req.body);
-    await newUser.save();
-    res.json({ success: true, message: "Utilisateur enregistré avec succès" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: err.message });
-  }
+    await Session.deleteOne({ _id: req.sessionRecord._id });
+    clearSessionCookie(res);
+    return res.status(204).end();
+  } catch (error) { return next(error); }
 });
-
-// إنشاء admin جديد
-app.post("/addAdmin", async (req, res) => {
+app.post('/auth/change-password', requireSameOrigin, requireCsrf, async (req, res, next) => {
   try {
-    const { username, password, role, province } = req.body;
-    const newAdmin = new Admin({ username, password, role, province });
-    await newAdmin.save();
-    res.json({ success: true, message: "Admin ajouté avec succès" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// تسجيل دخول admin
-app.post("/loginAdmin", async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const admin = await Admin.findOne({ username, password });
-    if (admin) {
-      res.json({
-        success: true,
-        role: admin.role,
-        province: admin.province,
-      });
-    } else {
-      res.json({
-        success: false,
-        message: "Nom d'utilisateur ou mot de passe incorrect.",
-      });
+    const { currentPassword, newPassword } = req.body || {};
+    if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || newPassword.length < 12 || newPassword.length > 128) {
+      return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir entre 12 et 128 caractères.' });
     }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: err.message });
-  }
+    const admin = await Admin.findById(req.admin.id).select('+password +passwordHash');
+    const verification = await verifyPassword(currentPassword, admin);
+    if (!verification.valid) return res.status(401).json({ error: 'Mot de passe actuel incorrect.' });
+    const passwordHash = await hashPassword(newPassword);
+    await Admin.updateOne({ _id: admin._id }, { $set: { passwordHash, passwordChangedAt: new Date() }, $unset: { password: '' } });
+    await Session.deleteMany({ adminId: admin._id });
+    clearSessionCookie(res);
+    return res.json({ success: true, message: 'Mot de passe modifié. Veuillez vous reconnecter.' });
+  } catch (error) { return next(error); }
+});
+app.use('/auth', (req, res) => res.status(404).json({ error: 'Route d’authentification introuvable.' }));
+
+// All administrative and private API routes below require an authenticated session and CSRF validation for writes.
+app.use(authenticate);
+app.use(requireCsrf);
+
+app.get('/users', requirePermission('users:read'), async (req, res, next) => {
+  try {
+    const requested = {};
+    if (req.query.status) requested.status = String(req.query.status);
+    if (req.query.region) requested.region = String(req.query.region);
+    if (req.query.province) requested.province = String(req.query.province);
+    const scope = scopedQuery(req, requested);
+    if (!scope) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
+    const page = Math.max(1, Math.min(10000, Number.parseInt(req.query.page, 10) || 1));
+    const limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 50));
+    const [users, total] = await Promise.all([
+      User.find(scope).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+      User.countDocuments(scope)
+    ]);
+    return res.json({ data: users, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (error) { return next(error); }
 });
 
-app.get("/users/:province", async (req, res) => {
+app.get('/users/:id/status', requirePermission('users:read'), async (req, res, next) => {
   try {
-    const inputProvince = req.params.province.trim();
-    const regex = new RegExp(inputProvince, "i");
-    const users = await User.find({ province: regex });
-    res.json(users);
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Identifiant invalide.' });
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    const scope = scopedQuery(req, { region: user.region, province: user.province });
+    if (!scope) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
+    return res.json({ status: user.status, validatedByDirectorRegional: user.validatedByDirectorRegional });
+  } catch (error) { return next(error); }
+});
+
+app.post('/createUser', requireSameOrigin, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    if (!rejectMongoOperators(body)) return res.status(400).json({ error: 'Données invalides.' });
+    const allowed = ['nom', 'prenom', 'age', 'cin', 'profession', 'region', 'province', 'commune', 'adresse', 'telephone', 'email'];
+    const input = Object.fromEntries(allowed.filter(key => body[key] !== undefined).map(key => [key, body[key]]));
+    if (!validText(input.nom, 1, 100) || !validText(input.prenom, 1, 100)) {
+      return res.status(400).json({ error: 'Nom et prénom obligatoires.' });
+    }
+    if (input.email && (typeof input.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email))) {
+      return res.status(400).json({ error: 'Adresse e-mail invalide.' });
+    }
+    const user = await User.create(input);
+    return res.status(201).json({ success: true, id: user._id, message: 'Inscription enregistrée.' });
+  } catch (error) { return next(error); }
+});
+
+app.post('/users/:id/status', requirePermission('registrations:validate'), async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Identifiant invalide.' });
+    const status = req.body?.status;
+    if (!['en attente', 'accepté', 'refusé'].includes(status)) return res.status(400).json({ error: 'Statut invalide.' });
+    const existing = await User.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    const scope = scopedQuery(req, { region: existing.region, province: existing.province });
+    if (!scope) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
+    const user = await User.findOneAndUpdate({ _id: existing._id, ...scope }, { $set: { status } }, { new: true, runValidators: true });
+    if (!user) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
+    return res.json({ success: true, user });
+  } catch (error) { return next(error); }
+});
+
+app.post('/addAdmin', requirePermission('admins:create'), async (req, res, next) => {
+  try {
+    const { username, password, role, province, region } = req.body || {};
+    const normalizedRole = normalizeRole(role);
+    if (!validText(username, 3, 80) || typeof password !== 'string' || password.length < 12 || password.length > 128 ||
+        !normalizedRole || !['ADMIN', 'REGIONAL_ADMIN', 'PROVINCIAL_ADMIN'].includes(normalizedRole)) {
+      return res.status(400).json({ error: 'Données administrateur invalides.' });
+    }
+    if (req.admin.role !== 'SUPER_ADMIN' && normalizedRole === 'ADMIN') return res.status(403).json({ error: 'Création de ce rôle interdite.' });
+    if (normalizedRole === 'PROVINCIAL_ADMIN' && !validText(province, 1, 120)) return res.status(400).json({ error: 'Province obligatoire.' });
+    if (normalizedRole === 'REGIONAL_ADMIN' && !validText(region, 1, 120)) return res.status(400).json({ error: 'Région obligatoire.' });
+    const passwordHash = await hashPassword(password);
+    const admin = await Admin.create({
+      username: username.trim().toLowerCase(), passwordHash, role: normalizedRole,
+      province: normalizedRole === 'PROVINCIAL_ADMIN' ? province.trim() : null,
+      region: normalizedRole === 'REGIONAL_ADMIN' ? region.trim() : null,
+      isActive: true
+    });
+    return res.status(201).json({ success: true, admin: publicAdmin(admin) });
   } catch (error) {
-    console.error("Erreur:", error);
-    res.status(500).json({ message: "Erreur du serveur" });
+    if (error.code === 11000) return res.status(409).json({ error: 'Ce nom d’utilisateur existe déjà.' });
+    return next(error);
   }
 });
 
-// API لتحديث حالة مستخدم (status)
-app.post("/users/:id/status", async (req, res) => {
+app.get('/admins', requirePermission('admins:read'), async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { status } = req.body;
-    const user = await User.findByIdAndUpdate(id, { status }, { new: true });
-    if (!user) {
-      return res.status(404).json({ error: "Utilisateur non trouvé" });
-    }
-    res.json(user);
+    const admins = await Admin.find().select('_id username role region province isActive createdAt').sort({ createdAt: -1 });
+    return res.json(admins.map(publicAdmin));
+  } catch (error) { return next(error); }
+});
+
+app.delete('/deleteAdmin/:username', requirePermission('admins:disable'), async (req, res, next) => {
+  try {
+    const target = await Admin.findOne({ username: req.params.username.toLowerCase() });
+    if (!target) return res.status(404).json({ error: 'Administrateur introuvable.' });
+    if (String(target._id) === req.admin.id) return res.status(400).json({ error: 'Vous ne pouvez pas désactiver votre propre compte.' });
+    if (normalizeRole(target.role) === 'SUPER_ADMIN' && req.admin.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Action interdite.' });
+    target.isActive = false;
+    await target.save();
+    await Session.deleteMany({ adminId: target._id });
+    return res.json({ success: true, message: 'Administrateur désactivé.' });
+  } catch (error) { return next(error); }
+});
+
+app.get('/users/:province', requirePermission('users:read'), async (req, res, next) => {
+  try {
+    const province = req.params.province.trim();
+    const scope = scopedQuery(req, { province });
+    if (!scope) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
+    const users = await User.find(scope).sort({ createdAt: -1 }).limit(100);
+    return res.json(users);
+  } catch (error) { return next(error); }
+});
+
+app.post('/addField', requirePermission('provinces:manage'), async (req, res, next) => {
+  try {
+    const { type, name } = req.body || {};
+    if (!['province', 'commune'].includes(type) || !validText(name, 1, 120)) return res.status(400).json({ error: 'Champ invalide.' });
+    const field = await Field.create({ type, name: name.trim() });
+    return res.status(201).json({ success: true, field });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Erreur serveur" });
-  }
-});
-// code
-app.delete("/deleteAdmin/:username", async (req, res) => {
-  try {
-    const { username } = req.params;
-    const deleted = await Admin.findOneAndDelete({ username });
-
-    if (!deleted) {
-      return res.json({ message: "❌ Aucun admin trouvé avec ce nom." });
-    }
-
-    res.json({ message: "✅ Admin supprimé." });
-  } catch (err) {
-    res.status(500).json({ message: "Erreur lors de la suppression." });
+    if (error.code === 11000) return res.status(409).json({ error: 'Ce champ existe déjà.' });
+    return next(error);
   }
 });
 
-// 🔄 Récupérer tous les admins
-app.get("/admins", async (req, res) => {
-  try {
-    const admins = await Admin.find();
-    if (!admins || admins.length === 0) {
-      return res.json([]);
-    }
-    res.json(admins);
-  } catch (err) {
-    res.status(500).json({ message: "Erreur lors de la récupération." });
-  }
-});
-//1
-
-// 📌 Schéma pour les champs personnalisés (province / commune)
-const FieldSchema = new mongoose.Schema({
-  type: String, // "province" ou "commune"
-  name: String, // Le nom entré par l’admin général
-});
-
-const Field = mongoose.model("Field", FieldSchema);
-
-// ✅ Route POST pour ajouter un champ
-app.post("/addField", async (req, res) => {
-  const { type, name } = req.body;
-
-  if (!type || !name) {
-    return res.status(400).json({ message: "Champs invalides" });
-  }
-
-  try {
-    // Vérifie s’il existe déjà
-    const exists = await Field.findOne({ type, name });
-    if (exists) {
-      return res.status(400).json({ message: `${type} déjà existant.` });
-    }
-
-    const newField = new Field({ type, name });
-    await newField.save();
-
-    res.json({ message: `${type} ajouté avec succès.` });
-  } catch (error) {
-    console.error("Erreur backend :", error);
-    res.status(500).json({ message: "Erreur serveur" });
-  }
-});
-//
-
-app.post("/validateDecision/:userId", async (req, res) => {
+app.post('/validateDecision/:userId', requirePermission('registrations:validate'), async (req, res, next) => {
   try {
     const { userId } = req.params;
-
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { validatedByDirectorRegional: true },
-      { new: true }
-    );
-
-    console.log("✅ Utilisateur mis à jour:", user); // أضف هذا السطر
-
-    if (!user) {
-      return res.status(404).json({ message: "Utilisateur non trouvé" });
-    }
-
-    res.json({ message: "Utilisateur validé avec succès", user });
-  } catch (error) {
-    console.error("Erreur lors de la validation:", error);
-    res.status(500).json({ message: "Erreur serveur" });
-  }
+    if (!mongoose.isValidObjectId(userId)) return res.status(400).json({ error: 'Identifiant invalide.' });
+    const existing = await User.findById(userId);
+    if (!existing) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    const scope = scopedQuery(req, { region: existing.region, province: existing.province });
+    if (!scope) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
+    const user = await User.findOneAndUpdate({ _id: userId, ...scope }, { $set: { validatedByDirectorRegional: true } }, { new: true });
+    if (!user) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
+    return res.json({ success: true, user });
+  } catch (error) { return next(error); }
 });
-//1
 
-//2
-app.get("/acceptedUsers", async (req, res) => {
+app.get('/acceptedUsers', requirePermission('registrations:read'), async (req, res, next) => {
   try {
-    const users = await User.find({ status: "accepté" }); // بدون فيلتر على المقاطعة
-    console.log("👀 Utilisateurs retournés:", users); // أضف هذا السطر
-    res.json(users);
-  } catch (error) {
-    console.error("Erreur récupération:", error);
-    res.status(500).json({ message: "Erreur serveur" });
-  }
+    const scope = scopedQuery(req, { status: 'accepté' });
+    if (!scope) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
+    return res.json(await User.find(scope).sort({ createdAt: -1 }).limit(500));
+  } catch (error) { return next(error); }
 });
-//
-// في ملف server.js أو أي ملف فيه تعريف الروتات
-app.get("/finalAccepted", async (req, res) => {
+
+app.get('/finalAccepted', requirePermission('registrations:read'), async (req, res, next) => {
   try {
-    const users = await User.find({ validatedByDirectorRegional: true });
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    const scope = scopedQuery(req, { validatedByDirectorRegional: true });
+    if (!scope) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
+    return res.json(await User.find(scope).sort({ createdAt: -1 }).limit(500));
+  } catch (error) { return next(error); }
 });
-//
 
-
-
-// Nouvelle route : statistiques par province
-app.get("/stats/provinces", async (req, res) => {
+app.get('/stats/provinces', requirePermission('statistics:read'), async (req, res, next) => {
   try {
-    const users = await User.find(); // récupère tous les utilisateurs
-
-    // Regrouper les utilisateurs par province
-    const stats = {};
-
-    users.forEach((user) => {
-      const province = (user.province || "Inconnue").trim();
-
-      if (!stats[province]) {
-        stats[province] = {
-          total: 0,
-          accepted: 0,
-          refused: 0,
-          pending: 0,
-        };
-      }
-
-      stats[province].total++;
-
-      const status = (user.status || "").toLowerCase().trim();
-      if (status === "accepted" || status === "accepté") stats[province].accepted++;
-      else if (status === "refused" || status === "refusé") stats[province].refused++;
-      else stats[province].pending++;
-    });
-
-    res.json(stats);
-  } catch (error) {
-    console.error("Erreur stats:", error);
-    res.status(500).json({ error: "Erreur lors du calcul des statistiques" });
-  }
-});
-const nodemailer = require("nodemailer");
-
-// Configure ton transporter SMTP (ex: Gmail)
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "ton.email@gmail.com",
-    pass: "ton-mot-de-passe-ou-app-password",
-  },
+    const scope = scopedQuery(req, {});
+    if (!scope) return res.status(403).json({ error: 'Périmètre géographique interdit.' });
+    const stats = await User.aggregate([
+      { $match: scope },
+      { $group: {
+        _id: { $ifNull: ['$province', 'Inconnue'] },
+        total: { $sum: 1 },
+        accepted: { $sum: { $cond: [{ $eq: ['$status', 'accepté'] }, 1, 0] } },
+        refused: { $sum: { $cond: [{ $eq: ['$status', 'refusé'] }, 1, 0] } },
+        pending: { $sum: { $cond: [{ $eq: ['$status', 'en attente'] }, 1, 0] } }
+      }},
+      { $sort: { _id: 1 } }
+    ]);
+    return res.json(stats);
+  } catch (error) { return next(error); }
 });
 
-// Fonction pour envoyer email
-const sendBadgeEmail = (email, userName) => {
-  const mailOptions = {
-    from: '"MonApp" <ton.email@gmail.com>',
-    to: email,
-    subject: "Votre badge d'acceptation",
-    text: `Bonjour ${userName},\n\nFélicitations, votre inscription a été acceptée.\nVoici votre badge d'acceptation.\n\nCordialement,\nL'équipe MonApp`,
-    // Tu peux ajouter un fichier joint ici
-    // attachments: [{ filename: "badge.png", path: "./path/to/badge.png" }]
-  };
-
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      console.error("Erreur envoi mail :", error);
-    } else {
-      console.log("Email envoyé :", info.response);
-    }
-  });
-};
-
-app.get("/", (req, res) => {
-  res.send("Server OK");
+app.use((req, res) => res.status(404).json({ error: 'Route introuvable.' }));
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  if (error && error.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON invalide.' });
+  if (error && error.name === 'ValidationError') return res.status(400).json({ error: 'Données invalides.' });
+  if (error && error.code === 11000) return res.status(409).json({ error: 'Ressource déjà existante.' });
+  // Never serialize request bodies, credentials, cookies, or raw database errors to clients.
+  return res.status(500).json({ error: 'Erreur interne du serveur.' });
 });
 
-// تشغيل السيرفر (après connexion réussie à MongoDB)
-const PORT = process.env.PORT || 3001;
-
-const startServer = async () => {
-  try {
-    await connectToDatabase();
-    app.listen(PORT, () => {
-      console.log(`✅ Serveur fonctionne sur http://localhost:${PORT}`);
-    });
-  } catch (error) {
-    console.error(
-      "⛔ Impossible de démarrer le serveur sans base de données. Vérifiez la connexion MongoDB."
-    );
+async function connectToDatabase() {
+  await mongoose.connect(getMongoUri(), { serverSelectionTimeoutMS: 5000 });
+  console.log('Connected to MongoDB.');
+}
+async function startServer() {
+  await connectToDatabase();
+  app.listen(PORT, () => console.log(`API listening on port ${PORT}`));
+}
+if (require.main === module) {
+  startServer().catch(() => {
+    console.error('Server startup failed. Check database configuration.');
     process.exit(1);
-  }
-};
+  });
+}
 
-startServer();
+module.exports = { app, startServer, models: { Admin, User, Field, Session } };
